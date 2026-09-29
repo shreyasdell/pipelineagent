@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
 
 
 class Settings(BaseSettings):
@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     github_token: Optional[str] = None  # Optional for initial testing
     github_repo: Optional[str] = None  # Optional for initial testing
 
+    # Hugging Face Configuration
+    huggingface_token: Optional[str] = None  # Optional for accessing private models
+    huggingface_model_id: Optional[str] = None  # Default model ID for testing
+
     # Podman Configuration
     podman_socket: str = "unix:///run/podman/podman.sock"
 
@@ -31,6 +35,33 @@ class Settings(BaseSettings):
     # Application Configuration
     log_level: str = "INFO"
     environment: str = "development"
+    
+    # Primary Agent Configuration
+    default_container_registry: str = "docker.io"
+    default_organization: str = "your-org"
+    default_base_image: str = "nvidia/cuda:12.1.0-runtime-ubuntu22.04"
+    service_endpoint_base_url: str = "https://api.example.com/inference"
+    
+    # Serving Framework Configuration
+    serving_framework_priority_str: str = "tensorrt-llm,vllm,triton,bentoml,sglang,llama.cpp"
+    
+    @property
+    def serving_framework_priority(self) -> List[str]:
+        """Parse serving framework priority from comma-separated string"""
+        return [fw.strip() for fw in self.serving_framework_priority_str.split(",") if fw.strip()]
+    
+    # Autoscaling Configuration
+    default_min_replicas: int = 2
+    default_max_replicas: int = 10
+    default_target_cpu_utilization: int = 70
+    default_target_memory_utilization: int = 80
+    default_scale_up_threshold: int = 80
+    default_scale_down_threshold: int = 30
+    
+    # Rollout Configuration
+    default_canary_initial_traffic: int = 5
+    default_canary_ramp_up_hours: int = 24
+    default_canary_monitoring_hours: int = 48
 
     class Config:
         env_file = ".env"
