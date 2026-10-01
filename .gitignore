@@ -1,6 +1,11 @@
 # Environment variables
 .env
 
+# Kubernetes
+.kube/
+gpu-runtime-test.yaml
+install.yaml
+
 # Python
 __pycache__/
 *.py[cod]

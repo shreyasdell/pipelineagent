@@ -327,3 +327,155 @@ class GitHubClient:
                 "message": f"Error verifying CI pipeline: {str(e)}",
                 "error": str(e)
             }
+    
+    def create_blob(self, content: str) -> Dict[str, Any]:
+        """
+        Create a Git blob (file content)
+        
+        Args:
+            content: File content to create blob from
+            
+        Returns:
+            Blob creation result with SHA
+        """
+        if not self.repo:
+            raise ValueError("GitHub repository not configured")
+        
+        endpoint = f"/repos/{self.repo}/git/blobs"
+        encoded_content = base64.b64encode(content.encode()).decode()
+        
+        data = {
+            "content": encoded_content,
+            "encoding": "base64"
+        }
+        
+        return self._make_request("POST", endpoint, data)
+    
+    def create_tree(self, tree_items: List[Dict[str, Any]], base_tree: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Create a Git tree (directory structure)
+        
+        Args:
+            tree_items: List of tree items (path, mode, type, sha)
+            base_tree: Base tree SHA to build upon
+            
+        Returns:
+            Tree creation result with SHA
+        """
+        if not self.repo:
+            raise ValueError("GitHub repository not configured")
+        
+        endpoint = f"/repos/{self.repo}/git/trees"
+        
+        data = {
+            "tree": tree_items
+        }
+        
+        if base_tree:
+            data["base_tree"] = base_tree
+        
+        return self._make_request("POST", endpoint, data)
+    
+    def create_commit(self, message: str, tree: str, parents: List[str]) -> Dict[str, Any]:
+        """
+        Create a Git commit
+        
+        Args:
+            message: Commit message
+            tree: Tree SHA
+            parents: List of parent commit SHAs
+            
+        Returns:
+            Commit creation result with SHA
+        """
+        if not self.repo:
+            raise ValueError("GitHub repository not configured")
+        
+        endpoint = f"/repos/{self.repo}/git/commits"
+        
+        data = {
+            "message": message,
+            "tree": tree,
+            "parents": parents
+        }
+        
+        return self._make_request("POST", endpoint, data)
+    
+    def update_reference(self, ref: str, sha: str, force: bool = False) -> Dict[str, Any]:
+        """
+        Update a Git reference (branch/tag)
+        
+        Args:
+            ref: Reference name (e.g., refs/heads/main)
+            sha: Commit SHA to point reference to
+            force: Force update
+            
+        Returns:
+            Reference update result
+        """
+        if not self.repo:
+            raise ValueError("GitHub repository not configured")
+        
+        endpoint = f"/repos/{self.repo}/git/refs/{ref}"
+        
+        data = {
+            "sha": sha,
+            "force": force
+        }
+        
+        return self._make_request("PATCH", endpoint, data)
+    
+    def get_branch(self, branch: str) -> Dict[str, Any]:
+        """
+        Get branch information
+        
+        Args:
+            branch: Branch name
+            
+        Returns:
+            Branch information
+        """
+        if not self.repo:
+            raise ValueError("GitHub repository not configured")
+        
+        endpoint = f"/repos/{self.repo}/git/refs/heads/{branch}"
+        return self._make_request("GET", endpoint)
+    
+    def get_commit(self, commit_sha: str) -> Dict[str, Any]:
+        """
+        Get commit information
+        
+        Args:
+            commit_sha: Commit SHA
+            
+        Returns:
+            Commit information
+        """
+        if not self.repo:
+            raise ValueError("GitHub repository not configured")
+        
+        endpoint = f"/repos/{self.repo}/git/commits/{commit_sha}"
+        return self._make_request("GET", endpoint)
+    
+    def create_reference(self, ref: str, sha: str) -> Dict[str, Any]:
+        """
+        Create a new Git reference (branch/tag)
+        
+        Args:
+            ref: Reference name (e.g., refs/heads/feature-branch)
+            sha: Commit SHA to point reference to
+            
+        Returns:
+            Reference creation result
+        """
+        if not self.repo:
+            raise ValueError("GitHub repository not configured")
+        
+        endpoint = f"/repos/{self.repo}/git/refs"
+        
+        data = {
+            "ref": ref,
+            "sha": sha
+        }
+        
+        return self._make_request("POST", endpoint, data)

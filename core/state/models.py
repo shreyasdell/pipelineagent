@@ -25,8 +25,9 @@ class AgentState(TypedDict):
     # Constraint Resolver outputs
     constraint_resolver_report: Optional[Dict[str, Any]] = None
     
-    # Inference Optimization outputs
+    # Inference Optimization outputs (deferred for future phase)
     inference_optimization_report: Optional[Dict[str, Any]] = None
+    inference_optimization_status: Optional[str] = "DEFERRED"
     
     # CI/CD outputs
     ci_pipeline: Optional[Dict[str, Any]] = None
@@ -35,15 +36,33 @@ class AgentState(TypedDict):
     deployment_report: Optional[Dict[str, Any]] = None
     service_endpoint: Optional[str] = None
     
-    # Observability outputs
+    # Kubernetes deployment outputs
+    kubernetes_deployment_report: Optional[Dict[str, Any]] = None
+    kubernetes_manifests: Optional[Dict[str, str]] = None
+    argocd_application: Optional[Dict[str, Any]] = None
+    
+    # ArgoCD/GitOps specific
+    argocd_status: Optional[Dict[str, Any]] = None
+    gitops_repository: Optional[str] = None
+    gitops_branch: Optional[str] = None
+    gitops_commit_sha: Optional[str] = None
+    argocd_sync_status: Optional[str] = None
+    argocd_health_status: Optional[str] = None
+    
+    # Observability outputs (deferred for future phase)
     observability_report: Optional[Dict[str, Any]] = None
     
-    # Final outputs
-    final_deployment_report: Optional[Dict[str, Any]] = None
+    # State machine tracking
+    current_state: Optional[str] = None  # Current state in workflow
+    state_history: Optional[List[Dict[str, Any]]] = None  # State transition history
+    deployment_type_decision: Optional[str] = None  # "local" or "kubernetes"
+    infrastructure_available: Optional[Dict[str, bool]] = None  # What infrastructure is available
     
     # Error handling
     errors: List[str] = []
     current_agent: Optional[str] = None
+    retry_count: int = 0
+    max_retries: int = 3
 
 
 class ConstraintResolverReport(TypedDict):

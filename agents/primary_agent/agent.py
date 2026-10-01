@@ -87,23 +87,20 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
         )
         
         try:
-            # Step 1: Decompose deployment into sub-tasks
-            logger.info("Decomposing deployment into sub-tasks...")
-            sub_agent_tasks = await self._decompose_tasks(state)
-            state["decomposed_sub_agent_tasks"] = sub_agent_tasks
+            # Step 1: Initialize deployment state for LangGraph workflow
+            logger.info("Initializing deployment state for LangGraph workflow...")
+            state["current_state"] = "REQUEST_RECEIVED"
+            state["retry_count"] = 0
+            state["max_retries"] = 3
             
-            # Step 2: Execute sub-agent tasks (simulated for now)
-            logger.info("Executing sub-agent tasks...")
-            task_results = await self._execute_sub_agent_tasks(sub_agent_tasks, state)
-            
-            # Step 3: Compile final deployment report
+            # Step 2: Compile final deployment report from workflow results
             logger.info("Compiling final deployment report...")
-            final_report = await self._compile_final_report(state, task_results)
+            final_report = await self._compile_final_report(state)
             state["final_deployment_report"] = final_report
             
             # Add message to conversation
             state["messages"].append(AIMessage(
-                content=f"Deployment orchestration complete. Report: {json.dumps(final_report, indent=2)}"
+                content=f"Deployment orchestration completed successfully via LangGraph workflow."
             ))
             
             # Save updated state
@@ -386,64 +383,99 @@ Consider the constraint resolver recommendations when creating tasks.
                 "message": f"Task {task['task_name']} completed successfully"
             }
     
-    async def _compile_final_report(self, state: AgentState, task_results: Dict[str, Any]) -> Dict[str, Any]:
+    async def _compile_final_report(self, state: AgentState) -> Dict[str, Any]:
         """
-        Compile final deployment report from task results
+        Compile final deployment report from LangGraph workflow state
         
         Args:
-            state: Current agent state
-            task_results: Results from sub-agent tasks
+            state: Current agent state with results from all workflow nodes
             
         Returns:
             Final deployment report
         """
         model_id = state['model_id']
-        deployment_type = state.get('deployment_type', 'standard')
+        deployment_type = state.get('deployment_type', 'kubernetes')
         
-        # Extract information from task results
-        ci_result = next(
-            (r for r in task_results.values() if r['assigned_to'] == 'ci_agent'),
-            {}
-        )
-        deployment_result = next(
-            (r for r in task_results.values() if r['assigned_to'] == 'deployment_pipeline_agent'),
-            {}
-        )
+        # Extract information from state
+        k8s_report = state.get('kubernetes_deployment_report', {})
+        ci_pipeline = state.get('ci_pipeline', {})
+        constraint_report = state.get('constraint_resolver_report', {})
         
-        # Generate service endpoint URL using configured base URL
-        service_endpoint = f"{settings.service_endpoint_base_url}/{model_id.replace('_', '-')}"
+        # Generate service endpoint from Kubernetes report or default
+        service_endpoint = k8s_report.get('service_endpoint', f"http://{model_id.replace('_', '-')}.model-serving.svc.cluster.local/v1/models")
+        
+        # Determine overall deployment status
+        deployment_status = "success"
+        if state.get('current_state') == 'FAILED':
+            deployment_status = "failed"
+        elif state.get('current_state') == 'RETRYING':
+            deployment_status = "retrying"
         
         # Compile final report
         final_report = {
             "deployment_conversation_id": state['deployment_conversation_id'],
             "model_id": model_id,
-            "deployment_status": "success",
+            "deployment_status": deployment_status,
             "deployment_timestamp": datetime.now().isoformat(),
             "service_endpoint": service_endpoint,
             "latency_requirement": state.get('latency_requirement', 'Not specified'),
             "deployment_type": deployment_type,
+            "constraint_analysis": {
+                "feasible": constraint_report.get('deployment_feasible', False),
+                "confidence": constraint_report.get('confidence', 0.0),
+                "recommendations": constraint_report.get('recommendations', [])
+            },
             "ci_pipeline": {
-                "pipeline_id": ci_result.get('result', {}).get('pipeline_id', 'N/A'),
-                "github_repository": ci_result.get('result', {}).get('github_repository', 'Not configured'),
-                "workflows_created": ci_result.get('result', {}).get('workflows_created', []),
-                "workflow_files": ci_result.get('result', {}).get('workflow_files', {}),
-                "pipeline_verification": ci_result.get('result', {}).get('pipeline_verification', {})
+                "pipeline_id": ci_pipeline.get('pipeline_id', 'N/A'),
+                "github_repository": ci_pipeline.get('github_repository', 'Not configured'),
+                "workflows_created": ci_pipeline.get('workflows_created', []),
+                "workflow_files": ci_pipeline.get('workflow_files', {})
             },
-            "deployment_pipeline": {
-                "deployment_id": deployment_result.get('result', {}).get('deployment_id', 'N/A'),
-                "argocd_application": deployment_result.get('result', {}).get('argocd_application', 'N/A'),
-                "kubernetes_manifests": deployment_result.get('result', {}).get('kubernetes_manifests', {}),
-                "container_image": deployment_result.get('result', {}).get('container_image', f"{settings.default_organization}/{model_id}:latest"),
-                "argocd_verification": deployment_result.get('result', {}).get('argocd_verification', {}),
-                "deployment_status": deployment_result.get('result', {}).get('deployment_status', 'unknown')
+            "kubernetes_deployment": {
+                "deployment_id": k8s_report.get('deployment_id', 'N/A'),
+                "namespace": k8s_report.get('kubernetes_manifests', {}).get('namespace', 'N/A'),
+                "gitops_commit": k8s_report.get('gitops_commit', {}),
+                "argocd_application": k8s_report.get('argocd_application', {}),
+                "argocd_sync": k8s_report.get('argocd_sync', {}),
+                "deployment_status": k8s_report.get('deployment_status', 'unknown'),
+                "service_endpoint": service_endpoint
             },
+            "infrastructure": state.get('infrastructure_available', {}),
+            "state_history": state.get('state_history', []),
             "summary": f"✅ Model {model_id} deployment orchestration complete\n"
-                      f"CI Pipeline: {ci_result.get('result', {}).get('pipeline_id', 'N/A')}\n"
-                      f"Deployment: {deployment_result.get('result', {}).get('deployment_id', 'N/A')}\n"
+                      f"CI Pipeline: {ci_pipeline.get('pipeline_id', 'N/A')}\n"
+                      f"Kubernetes Deployment: {k8s_report.get('deployment_id', 'N/A')}\n"
                       f"Endpoint: {service_endpoint}\n"
-                      f"ArgoCD Status: {deployment_result.get('result', {}).get('argocd_verification', {}).get('overall_status', 'unknown')}",
-            "tasks_executed": len(task_results),
-            "task_details": task_results
+                      f"ArgoCD Sync: {k8s_report.get('argocd_sync', {}).get('status', 'unknown')}"
         }
         
         return final_report
+    
+    async def _initialize_deployment_state(self, state: AgentState) -> AgentState:
+        """
+        Initialize deployment state for LangGraph workflow
+        
+        Args:
+            state: Current agent state
+            
+        Returns:
+            Updated state with initial values
+        """
+        # Ensure required fields are present
+        if not state.get("deployment_type"):
+            state["deployment_type"] = "kubernetes"
+        
+        if not state.get("errors"):
+            state["errors"] = []
+        
+        if not state.get("state_history"):
+            state["state_history"] = []
+        
+        # Add initial state to history
+        state["state_history"].append({
+            "state": "REQUEST_RECEIVED",
+            "timestamp": datetime.now().isoformat(),
+            "agent": "primary_agent"
+        })
+        
+        return state
