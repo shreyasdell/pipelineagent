@@ -22,8 +22,8 @@ async def configure_argocd():
         client = ArgoCDClient()
         
         # Repository configuration
-        # Use HTTPS with insecure SSL (for development)
-        repo_url = "https://github.com/shreyasdell/pipelineagent.git"
+        # Use SSH to avoid SSL certificate issues
+        repo_url = "git@github.com:shreyasdell/pipelineagent.git"
         
         # ArgoCD application configuration
         app_name = "agentic-pipeline-gitops"

@@ -29,10 +29,12 @@ GITHUB_TOKEN=ghp_your_token_here
 GITHUB_REPO=shreyasdell/pipelineagent
 
 ================================================================================
-2. ARGOCD CONFIGURATION - Manual Setup
+2. ARGOCD CONFIGURATION - Manual Setup (SSH for SSL Issues)
 ================================================================================
 
-Option A: Use ArgoCD Web UI (Recommended for SSL issues)
+Due to SSL certificate issues in the WSL environment, use SSH instead of HTTPS.
+
+Option A: Use ArgoCD Web UI with SSH (Recommended)
 
 Step 1: Access ArgoCD UI
 - Port-forward ArgoCD server:
@@ -43,30 +45,45 @@ Step 2: Open browser
 - Login with username: admin
 - Password: Bait9DThT0lO8AvY
 
-Step 3: Add Repository
+Step 3: Add Repository via SSH
 - Click "Settings" → "Repositories"
 - Click "Connect Repo"
-- Select "Via HTTPS"
-- Repository URL: https://github.com/shreyasdell/pipelineagent.git
+- Select "Via SSH"
+- Repository URL: git@github.com:shreyasdell/pipelineagent.git
 - Click "Connect"
-- Skip SSL verification if prompted
+- If prompted for SSH key, skip for now (use default)
 
 Step 4: Create Application
 - Click "New App"
 - Application Name: agentic-pipeline-gitops
 - Project: default
 - Sync Policy: Automatic
-- Repository URL: https://github.com/shreyasdell/pipelineagent.git
+- Repository URL: git@github.com:shreyasdell/pipelineagent.git
 - Revision: HEAD
 - Path: deployment/manifests
 - Destination: https://kubernetes.default.svc
 - Namespace: model-serving
 - Click "Create"
 
-Option B: Configure via kubectl (SSL issues with current setup)
+Option B: Configure SSH Keys in ArgoCD (If SSH fails)
 
-Due to SSL certificate issues in the WSL environment, manual configuration
-via the ArgoCD UI is recommended.
+If SSH connection fails, you may need to add your SSH key to ArgoCD:
+
+Step 1: Get your SSH public key
+- On your host machine: cat ~/.ssh/id_rsa.pub
+
+Step 2: Add SSH key to ArgoCD
+- In ArgoCD UI: Settings → Repositories
+- Click "Connect Repo" → "Via SSH"
+- Click "SSH Private Key"
+- Paste your private key content
+- Click "Connect"
+
+Option C: Configure via kubectl with SSH
+
+kubectl create secret generic argocd-ssh-key \
+  --from-file=ssh-privatekey=/path/to/your/private/key \
+  -n argocd
 
 ================================================================================
 3. DIRECTORY STRUCTURE
