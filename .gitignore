@@ -6,6 +6,9 @@
 gpu-runtime-test.yaml
 install.yaml
 
+# Scripts (may contain credentials)
+scripts/
+
 # Python
 __pycache__/
 *.py[cod]
