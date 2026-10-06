@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-phi4-mini
+  namespace: model-serving
+  labels:
+    app: vllm-phi4-mini
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-phi4-mini
+  template:
+    metadata:
+      labels:
+        app: vllm-phi4-mini
+    spec:
+      runtimeClassName: nvidia
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: VLLM_DISABLE_COMPILE_CACHE
+          value: "1"
+        command:
+        - vllm
+        - serve
+        - pytorch/Phi-4-mini-instruct-FP8
+        - --tokenizer
+        - microsoft/Phi-4-mini-instruct
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+        - --gpu-memory-utilization
+        - "0.85"
+        - --max-model-len
+        - "4096"
+        - --trust-remote-code
+        resources:
+          requests:
+            cpu: "2"
+            memory: "8Gi"
+          limits:
+            cpu: "4"
+            memory: "16Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
