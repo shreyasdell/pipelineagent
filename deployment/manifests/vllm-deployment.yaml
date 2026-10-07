@@ -23,6 +23,8 @@ spec:
         - sh
         - -c
         - |
+          apt-get update && apt-get install -y ca-certificates
+          mkdir -p /usr/local/share/ca-certificates
           cp /certs/dell-ca.crt /usr/local/share/ca-certificates/dell-ca.crt
           update-ca-certificates
         volumeMounts:
