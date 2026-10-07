@@ -18,12 +18,16 @@ spec:
       runtimeClassName: nvidia
       containers:
       - name: vllm
-        image: vllm/vllm-openai:latest
+        image: vllm/vllm-openai:v0.6.3.post1
         ports:
         - containerPort: 8000
         env:
         - name: VLLM_DISABLE_COMPILE_CACHE
           value: "1"
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/dell-ca.crt
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/dell-ca.crt
         command:
         - vllm
         - serve
@@ -43,6 +47,10 @@ spec:
           limits:
             cpu: "4"
             memory: "16Gi"
+        volumeMounts:
+        - name: dell-ca
+          mountPath: /etc/ssl/certs/dell-ca.crt
+          subPath: dell-ca.crt
         livenessProbe:
           httpGet:
             path: /health
@@ -55,3 +63,7 @@ spec:
             port: 8000
           initialDelaySeconds: 60
           periodSeconds: 10
+      volumes:
+      - name: dell-ca
+        configMap:
+          name: dell-ca-config
