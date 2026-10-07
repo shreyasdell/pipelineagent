@@ -16,18 +16,30 @@ spec:
         app: vllm-phi4-mini
     spec:
       runtimeClassName: nvidia
+      initContainers:
+      - name: install-ca
+        image: alpine:3.18
+        command:
+        - sh
+        - -c
+        - |
+          cat /certs/dell-ca.crt >> /etc/ssl/certs/ca-certificates.crt
+          cat /certs/dell-ca.crt >> /etc/ssl/certs/ca-bundle.crt
+        volumeMounts:
+        - name: dell-ca
+          mountPath: /certs/dell-ca.crt
+          subPath: dell-ca.crt
+        - name: ca-store
+          mountPath: /etc/ssl/certs
       containers:
       - name: vllm
         image: vllm/vllm-openai:v0.6.3
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
         env:
         - name: VLLM_DISABLE_COMPILE_CACHE
           value: "1"
-        - name: REQUESTS_CA_BUNDLE
-          value: /etc/ssl/certs/dell-ca.crt
-        - name: SSL_CERT_FILE
-          value: /etc/ssl/certs/dell-ca.crt
         command:
         - vllm
         - serve
@@ -48,9 +60,8 @@ spec:
             cpu: "4"
             memory: "16Gi"
         volumeMounts:
-        - name: dell-ca
-          mountPath: /etc/ssl/certs/dell-ca.crt
-          subPath: dell-ca.crt
+        - name: ca-store
+          mountPath: /etc/ssl/certs
         livenessProbe:
           httpGet:
             path: /health
@@ -67,3 +78,5 @@ spec:
       - name: dell-ca
         configMap:
           name: dell-ca-config
+      - name: ca-store
+        emptyDir: {}
