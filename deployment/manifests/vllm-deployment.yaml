@@ -23,8 +23,9 @@ spec:
         - sh
         - -c
         - |
-          cat /certs/dell-ca.crt >> /etc/ssl/certs/ca-certificates.crt
-          cat /certs/dell-ca.crt >> /etc/ssl/certs/ca-bundle.crt
+          apk add --no-cache ca-certificates
+          cp /certs/dell-ca.crt /usr/local/share/ca-certificates/dell-ca.crt
+          update-ca-certificates
         volumeMounts:
         - name: dell-ca
           mountPath: /certs/dell-ca.crt
