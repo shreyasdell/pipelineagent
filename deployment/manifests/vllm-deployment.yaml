@@ -40,9 +40,9 @@ spec:
         - --port
         - "8000"
         - --gpu-memory-utilization
-        - "0.8"
+        - "0.7"
         - --max-model-len
-        - "2048"
+        - "4096"
         - --trust-remote-code
         resources:
           requests:
