@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-phi3-mini
+  namespace: model-serving
+  labels:
+    app: vllm-phi3-mini
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-phi3-mini
+  template:
+    metadata:
+      labels:
+        app: vllm-phi3-mini
+    spec:
+      runtimeClassName: nvidia
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:v0.6.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: VLLM_DISABLE_COMPILE_CACHE
+          value: "1"
+        - name: HF_HUB_OFFLINE
+          value: "1"
+        - name: TRANSFORMERS_OFFLINE
+          value: "1"
+        - name: HF_DATASETS_OFFLINE
+          value: "1"
+        command:
+        - vllm
+        - serve
+        - /models
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+        - --gpu-memory-utilization
+        - "0.8"
+        - --max-model-len
+        - "2048"
+        - --trust-remote-code
+        resources:
+          requests:
+            cpu: "2"
+            memory: "8Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - name: model-storage
+          mountPath: /models
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+      volumes:
+      - name: model-storage
+        hostPath:
+          path: /mnt/c/Users/Shreyas_DK/Projects/AgenticPipeline/models/Phi-3-mini-4k-instruct
+          type: Directory
