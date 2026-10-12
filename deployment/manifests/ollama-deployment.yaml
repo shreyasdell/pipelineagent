@@ -1,53 +1,54 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ollama-qwen
+  name: ollama
   namespace: model-serving
   labels:
-    app: ollama-qwen
+    app: ollama
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ollama-qwen
+      app: ollama
   template:
     metadata:
       labels:
-        app: ollama-qwen
+        app: ollama
     spec:
       runtimeClassName: nvidia
       containers:
       - name: ollama
         image: ollama/ollama:latest
-        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 11434
         env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "all"
         - name: OLLAMA_HOST
-          value: 0.0.0.0
-        - name: OLLAMA_NUM_GPU
-          value: "1"
+          value: "0.0.0.0"
         resources:
           requests:
             cpu: "2"
-            memory: "2Gi"
+            memory: "8Gi"
+            nvidia.com/gpu: "1"
           limits:
             cpu: "4"
-            memory: "4Gi"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
         volumeMounts:
         - name: ollama-models
-          mountPath: /root/.ollama/models
+          mountPath: /root/.ollama
         livenessProbe:
           httpGet:
             path: /
             port: 11434
-          initialDelaySeconds: 60
+          initialDelaySeconds: 30
           periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /
             port: 11434
-          initialDelaySeconds: 30
+          initialDelaySeconds: 10
           periodSeconds: 10
       volumes:
       - name: ollama-models
