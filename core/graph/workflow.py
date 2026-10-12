@@ -18,7 +18,7 @@ WorkflowState = Literal[
     "ARGOCD_APPLICATION_READY",
     "ARGOCD_SYNCING",
     "K8S_DEPLOYMENT",
-    "VLLM_STARTING",
+    "OBSERVABILITY_SETUP",
     "HEALTH_CHECK",
     "DEPLOYED",
     "FAILED",
@@ -45,17 +45,19 @@ def create_deployment_graph():
     workflow.add_node("ci_agent", ci_agent_node)
     workflow.add_node("kubernetes_deployment", kubernetes_deployment_node)
     workflow.add_node("argocd_sync", argocd_sync_node)
+    workflow.add_node("observability", observability_node)
     workflow.add_node("health_check", health_check_node)
     
     # Define edges (workflow)
     workflow.set_entry_point("primary_agent")
-    
+
     workflow.add_edge("primary_agent", "constraint_resolver")
     workflow.add_edge("constraint_resolver", "deployment_pipeline")
     workflow.add_edge("deployment_pipeline", "ci_agent")
     workflow.add_edge("ci_agent", "kubernetes_deployment")
     workflow.add_edge("kubernetes_deployment", "argocd_sync")
-    workflow.add_edge("argocd_sync", "health_check")
+    workflow.add_edge("argocd_sync", "observability")
+    workflow.add_edge("observability", "health_check")
     workflow.add_edge("health_check", END)
     
     # Add conditional edges for error handling
@@ -228,6 +230,33 @@ async def kubernetes_deployment_node(state: AgentState) -> AgentState:
         "kubernetes_deployment_agent"
     )
     
+    return state
+
+
+async def observability_node(state: AgentState) -> AgentState:
+    """
+    Observability Agent node - Sets up monitoring and observability infrastructure
+    """
+    logger.info("Observability Agent: Setting up monitoring infrastructure")
+
+    # Import and run the actual observability agent
+    from agents.observability.agent import ObservabilityAgent
+
+    # Update state
+    state["current_state"] = "OBSERVABILITY_SETUP"
+    state["current_agent"] = "observability_agent"
+
+    # Run observability agent
+    observability_agent = ObservabilityAgent()
+    state = await observability_agent.setup_observability(state)
+
+    # Save state
+    state_manager.save_state(
+        state["deployment_conversation_id"],
+        state,
+        "observability_agent"
+    )
+
     return state
 
 
