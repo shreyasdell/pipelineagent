@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     podman_socket: str = "unix:///run/podman/podman.sock"
     
     # Kubernetes Configuration
-    kubeconfig_path: str = "/workspaces/AgenticPipeline/.kube/config"
+    kubeconfig_path: Optional[str] = None  # Use default kubeconfig if not set
 
     # Argo CD Configuration
     argocd_url: Optional[str] = None

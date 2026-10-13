@@ -77,7 +77,10 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
             os.environ['KUBECONFIG'] = settings.kubeconfig_path
             
             # Load kubeconfig with explicit file path
-            config.load_kube_config(config_file=settings.kubeconfig_path)
+            if settings.kubeconfig_path:
+                config.load_kube_config(config_file=settings.kubeconfig_path)
+            else:
+                config.load_kube_config()  # Use default kubeconfig
             
             # Initialize API clients
             self.core_v1 = client.CoreV1Api()
@@ -720,6 +723,178 @@ Consider the model characteristics, infrastructure constraints, and serving requ
         }
     
     def _generate_kubernetes_manifests(self, k8s_design: Dict[str, Any], state: AgentState) -> Dict[str, str]:
+        """
+        Generate Kubernetes manifests for vLLM or Ollama deployment
+        
+        Args:
+            k8s_design: Kubernetes deployment design configuration
+            state: Current agent state
+            
+        Returns:
+            Dictionary of Kubernetes manifests
+        """
+        model_id = state['model_id']
+        
+        # Check if this is an Ollama model (format: "model:tag")
+        is_ollama = ':' in model_id and not '/' in model_id
+        
+        if is_ollama:
+            return self._generate_ollama_manifests(k8s_design, state)
+        else:
+            return self._generate_vllm_manifests(k8s_design, state)
+    
+    def _generate_ollama_manifests(self, k8s_design: Dict[str, Any], state: AgentState) -> Dict[str, str]:
+        """
+        Generate Kubernetes manifests for Ollama deployment
+        
+        Args:
+            k8s_design: Kubernetes deployment design configuration
+            state: Current agent state
+            
+        Returns:
+            Dictionary of Kubernetes manifests
+        """
+        model_id = state['model_id']
+        safe_model_id = model_id.replace('_', '-').replace(':', '-')
+        k8s_config = k8s_design.get("kubernetes_configuration", {})
+        resource_reqs = k8s_config.get("resource_requirements", {})
+        gpu_reqs = k8s_config.get("gpu_requirements", {})
+        
+        namespace = k8s_config.get("namespace", settings.default_namespace)
+        deployment_name = k8s_config.get("deployment_name", safe_model_id)
+        service_name = k8s_config.get("service_name", safe_model_id)
+        replicas = k8s_config.get("replicas", settings.default_replicas)
+        
+        # Generate Namespace manifest
+        namespace_yaml = f"""apiVersion: v1
+kind: Namespace
+metadata:
+  name: {namespace}
+"""
+        
+        # Generate PVC for Ollama models
+        pvc_yaml = f"""apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {deployment_name}-models-pvc
+  namespace: {namespace}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+"""
+        
+        # Generate Deployment manifest for Ollama
+        deployment_yaml = f"""apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {deployment_name}
+  namespace: {namespace}
+  labels:
+    app: {deployment_name}
+    model: {model_id}
+spec:
+  replicas: {replicas}
+  selector:
+    matchLabels:
+      app: {deployment_name}
+  template:
+    metadata:
+      labels:
+        app: {deployment_name}
+        model: {model_id}
+    spec:
+      runtimeClassName: nvidia
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+        env:
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "all"
+        - name: OLLAMA_HOST
+          value: "0.0.0.0"
+        resources:
+          requests:
+            cpu: {resource_reqs.get('cpu', '2')}
+            memory: {resource_reqs.get('memory', '8Gi')}
+"""
+        
+        # Add GPU resources if enabled
+        if gpu_reqs.get("enabled", False):
+            deployment_yaml += f"""            nvidia.com/gpu: {gpu_reqs.get('gpu', '1')}
+          limits:
+            nvidia.com/gpu: {gpu_reqs.get('gpu', '1')}
+        volumeMounts:
+        - name: ollama-models
+          mountPath: /root/.ollama
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 11434
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: ollama-models
+        persistentVolumeClaim:
+          claimName: {deployment_name}-models-pvc
+"""
+        else:
+            deployment_yaml += f"""          limits:
+            cpu: {resource_reqs.get('cpu', '4')}
+            memory: {resource_reqs.get('memory', '16Gi')}
+        volumeMounts:
+        - name: ollama-models
+          mountPath: /root/.ollama
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 11434
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 11434
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: ollama-models
+        emptyDir: {{}}
+"""
+        
+        # Generate Service manifest
+        service_yaml = f"""apiVersion: v1
+kind: Service
+metadata:
+  name: {service_name}
+  namespace: {namespace}
+spec:
+  selector:
+    app: {deployment_name}
+  ports:
+  - port: 11434
+    targetPort: 11434
+  type: ClusterIP
+"""
+        
+        return {
+            "namespace": namespace_yaml,
+            "pvc": pvc_yaml,
+            "deployment": deployment_yaml,
+            "service": service_yaml
+        }
+    
+    def _generate_vllm_manifests(self, k8s_design: Dict[str, Any], state: AgentState) -> Dict[str, str]:
         """
         Generate Kubernetes manifests for vLLM deployment
         

@@ -181,7 +181,7 @@ async def main():
     logger.info(f"\n✅ Infrastructure check passed. Recommended deployment type: {recommended_type}")
     
     # Example deployment configuration
-    model_id = "Qwen/Qwen2.5-7B"
+    model_id = "phi3:mini"  # Ollama model format
     latency_requirement = "<100ms"
     deployment_type = "standard"
     

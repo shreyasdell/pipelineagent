@@ -8,7 +8,7 @@ class AgentState(TypedDict):
     
     # Conversation management
     messages: Annotated[list, add_messages]
-    deployment_conversation_id: str
+    deployment_conversation_id: Optional[str] = None  # Only set once by Primary Agent
     
     # Input parameters
     model_id: str

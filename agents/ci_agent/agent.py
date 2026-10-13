@@ -501,7 +501,9 @@ Consider the model characteristics and infrastructure constraints when designing
         
         try:
             # Create a feature branch for CI pipeline changes
-            branch_name = f"ci-pipeline-{state['model_id']}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            # Sanitize model ID for branch name (remove special characters)
+            safe_model_id = state['model_id'].replace('/', '-').replace(':', '-').replace('_', '-')
+            branch_name = f"ci-pipeline-{safe_model_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
             try:
                 self.github_client.create_branch(branch_name)
                 logger.info(f"Created branch: {branch_name}")
