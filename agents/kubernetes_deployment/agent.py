@@ -73,11 +73,9 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
     def _init_kubernetes_client(self):
         """Initialize Kubernetes client from kubeconfig"""
         try:
-            # Set KUBECONFIG environment variable
-            os.environ['KUBECONFIG'] = settings.kubeconfig_path
-            
-            # Load kubeconfig with explicit file path
+            # Set KUBECONFIG environment variable only if path is provided
             if settings.kubeconfig_path:
+                os.environ['KUBECONFIG'] = settings.kubeconfig_path
                 config.load_kube_config(config_file=settings.kubeconfig_path)
             else:
                 config.load_kube_config()  # Use default kubeconfig

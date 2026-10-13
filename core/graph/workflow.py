@@ -116,11 +116,12 @@ async def primary_agent_node(state: AgentState) -> AgentState:
     ))
     
     # Save state
-    state_manager.save_state(
-        state["deployment_conversation_id"],
-        state,
-        "primary_agent"
-    )
+    if state.get("deployment_conversation_id"):
+        state_manager.save_state(
+            state["deployment_conversation_id"],
+            state,
+            "primary_agent"
+        )
     
     return state
 
@@ -143,11 +144,12 @@ async def constraint_resolver_node(state: AgentState) -> AgentState:
     state = await constraint_agent.analyze_constraints(state)
     
     # Save state
-    state_manager.save_state(
-        state["deployment_conversation_id"],
-        state,
-        "constraint_resolver"
-    )
+    if state.get("deployment_conversation_id"):
+        state_manager.save_state(
+            state["deployment_conversation_id"],
+            state,
+            "constraint_resolver"
+        )
     
     return state
 
@@ -170,11 +172,12 @@ async def deployment_pipeline_node(state: AgentState) -> AgentState:
     state = await deployment_agent.create_deployment_pipeline(state)
     
     # Save state
-    state_manager.save_state(
-        state["deployment_conversation_id"],
-        state,
-        "deployment_pipeline_agent"
-    )
+    if state.get("deployment_conversation_id"):
+        state_manager.save_state(
+            state["deployment_conversation_id"],
+            state,
+            "deployment_pipeline_agent"
+        )
     
     return state
 
@@ -197,11 +200,12 @@ async def ci_agent_node(state: AgentState) -> AgentState:
     state = await ci_agent.create_ci_pipeline(state)
     
     # Save state
-    state_manager.save_state(
-        state["deployment_conversation_id"],
-        state,
-        "ci_agent"
-    )
+    if state.get("deployment_conversation_id"):
+        state_manager.save_state(
+            state["deployment_conversation_id"],
+            state,
+            "ci_agent"
+        )
     
     return state
 
@@ -224,11 +228,12 @@ async def kubernetes_deployment_node(state: AgentState) -> AgentState:
     state = await k8s_agent.create_kubernetes_deployment(state)
     
     # Save state
-    state_manager.save_state(
-        state["deployment_conversation_id"],
-        state,
-        "kubernetes_deployment_agent"
-    )
+    if state.get("deployment_conversation_id"):
+        state_manager.save_state(
+            state["deployment_conversation_id"],
+            state,
+            "kubernetes_deployment_agent"
+        )
     
     return state
 
@@ -251,11 +256,12 @@ async def observability_node(state: AgentState) -> AgentState:
     state = await observability_agent.setup_observability(state)
 
     # Save state
-    state_manager.save_state(
-        state["deployment_conversation_id"],
-        state,
-        "observability_agent"
-    )
+    if state.get("deployment_conversation_id"):
+        state_manager.save_state(
+            state["deployment_conversation_id"],
+            state,
+            "observability_agent"
+        )
 
     return state
 
@@ -279,6 +285,13 @@ async def argocd_sync_node(state: AgentState) -> AgentState:
         state["messages"].append(AIMessage(
             content="⚠️ ArgoCD not configured - deployment completed without GitOps sync"
         ))
+        # Skip saving state if deployment_conversation_id is not set
+        if state.get("deployment_conversation_id"):
+            state_manager.save_state(
+                state["deployment_conversation_id"],
+                state,
+                "argocd_sync"
+            )
     else:
         # ArgoCD sync is handled within Kubernetes Deployment Agent
         # This node primarily monitors and reports status
@@ -288,22 +301,25 @@ async def argocd_sync_node(state: AgentState) -> AgentState:
         
         if sync_status == "Synced" and health_status in ["Healthy", "Progressing"]:
             state["current_state"] = "K8S_DEPLOYMENT"
+            state["argocd_sync_status"] = "synced"
             state["messages"].append(AIMessage(
                 content=f"✅ ArgoCD sync successful - Sync: {sync_status}, Health: {health_status}"
             ))
         else:
             state["current_state"] = "RETRYING"
+            state["argocd_sync_status"] = "failed"
             state["errors"].append(f"ArgoCD sync pending - Sync: {sync_status}, Health: {health_status}")
             state["messages"].append(AIMessage(
                 content=f"⏳ ArgoCD sync in progress - Sync: {sync_status}, Health: {health_status}"
             ))
-    
-    # Save state
-    state_manager.save_state(
-        state["deployment_conversation_id"],
-        state,
-        "argocd_sync"
-    )
+        
+        # Save state
+        if state.get("deployment_conversation_id"):
+            state_manager.save_state(
+                state["deployment_conversation_id"],
+                state,
+                "argocd_sync"
+            )
     
     return state
 
@@ -409,7 +425,7 @@ def should_continue_argocd_sync(state: AgentState) -> Literal["synced", "failed"
     
     if argocd_sync_status == "skipped":
         return "skipped"
-    elif argocd_sync_status == "success":
+    elif argocd_sync_status in ["success", "Synced", "synced"]:
         return "synced"
     else:
         return "failed"
