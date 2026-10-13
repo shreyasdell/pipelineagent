@@ -181,7 +181,7 @@ async def main():
     logger.info(f"\n✅ Infrastructure check passed. Recommended deployment type: {recommended_type}")
     
     # Example deployment configuration
-    model_id = "phi3:mini"  # Ollama model format
+    model_id = "microsoft/Phi-3-mini-4k-instruct"  # HuggingFace model
     latency_requirement = "<100ms"
     deployment_type = "standard"
     

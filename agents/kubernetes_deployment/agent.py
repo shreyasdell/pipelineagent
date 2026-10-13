@@ -259,17 +259,18 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
             }
     
     def _check_vllm(self) -> Dict[str, Any]:
-        """Check vLLM availability"""
+        """Check SGLang availability (replacing vLLM for newer GPUs)"""
         try:
-            import vllm
+            import sglang
             return {
                 "available": True,
-                "version": vllm.__version__
+                "version": "SGLang installed",
+                "reason": "SGLang supports newer GPU architectures like Blackwell"
             }
         except ImportError:
             return {
                 "available": False,
-                "error": "vllm package not installed"
+                "error": "SGLang not installed - run: pip install sglang[all]"
             }
         except Exception as e:
             return {
@@ -278,19 +279,10 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
             }
     
     def _check_huggingface(self, state: AgentState) -> Dict[str, Any]:
-        """Check Hugging Face connectivity (skip for local Ollama models)"""
-        # Skip Hugging Face check for local Ollama models
-        model_id = state.get('model_id', '')
-        if ':' in model_id and not '/' in model_id:  # Ollama model format
-            logger.info(f"Skipping Hugging Face check for local Ollama model: {model_id}")
-            return {
-                "available": False,
-                "reason": "Using local Ollama model"
-            }
-        
+        """Check Hugging Face connectivity (required for HuggingFace models)"""
+        # Always check Hugging Face for HuggingFace models
         try:
-            # Test with a simple model info request
-            model_info = self.huggingface_client.get_model_info("Qwen/Qwen2.5-7B")
+            model_info = self.huggingface_client.get_model_info("microsoft/Phi-3-mini-4k-instruct")
             if model_info:
                 return {
                     "available": True,
@@ -742,7 +734,7 @@ Consider the model characteristics, infrastructure constraints, and serving requ
     
     def _generate_kubernetes_manifests(self, k8s_design: Dict[str, Any], state: AgentState) -> Dict[str, str]:
         """
-        Generate Kubernetes manifests for vLLM or Ollama deployment
+        Generate Kubernetes manifests for SGLang deployment
         
         Args:
             k8s_design: Kubernetes deployment design configuration
@@ -753,17 +745,12 @@ Consider the model characteristics, infrastructure constraints, and serving requ
         """
         model_id = state['model_id']
         
-        # Check if this is an Ollama model (format: "model:tag")
-        is_ollama = ':' in model_id and not '/' in model_id
-        
-        if is_ollama:
-            return self._generate_ollama_manifests(k8s_design, state)
-        else:
-            return self._generate_vllm_manifests(k8s_design, state)
+        # Always use SGLang for HuggingFace models
+        return self._generate_sglang_manifests(k8s_design, state)
     
-    def _generate_ollama_manifests(self, k8s_design: Dict[str, Any], state: AgentState) -> Dict[str, str]:
+    def _generate_sglang_manifests(self, k8s_design: Dict[str, Any], state: AgentState) -> Dict[str, str]:
         """
-        Generate Kubernetes manifests for Ollama deployment
+        Generate Kubernetes manifests for SGLang deployment
         
         Args:
             k8s_design: Kubernetes deployment design configuration
@@ -773,7 +760,7 @@ Consider the model characteristics, infrastructure constraints, and serving requ
             Dictionary of Kubernetes manifests
         """
         model_id = state['model_id']
-        safe_model_id = model_id.replace('_', '-').replace(':', '-')
+        safe_model_id = model_id.replace('_', '-').replace('/', '-').replace(':', '-')
         k8s_config = k8s_design.get("kubernetes_configuration", {})
         resource_reqs = k8s_config.get("resource_requirements", {})
         gpu_reqs = k8s_config.get("gpu_requirements", {})
@@ -790,7 +777,7 @@ metadata:
   name: {namespace}
 """
         
-        # Generate PVC for Ollama models
+        # Generate PVC for model storage
         pvc_yaml = f"""apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -801,10 +788,23 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
+      storage: 50Gi
 """
         
-        # Generate Deployment manifest for Ollama
+        # Generate ConfigMap for SGLang configuration
+        configmap_yaml = f"""apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {deployment_name}-config
+  namespace: {namespace}
+data:
+  MODEL_ID: "{model_id}"
+  MODEL_PATH: "{settings.sglang_model_path}"
+  PORT: "{settings.sglang_port}"
+  HOST: "{settings.sglang_host}"
+"""
+        
+        # Generate Deployment manifest for SGLang
         deployment_yaml = f"""apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -826,19 +826,43 @@ spec:
     spec:
       runtimeClassName: nvidia
       containers:
-      - name: ollama
-        image: ollama/ollama:latest
-        ports:
-        - containerPort: 11434
+      - name: sglang-server
+        image: {settings.sglang_image}
+        command: ["python", "-m", "sglang.launch_server"]
+        args: [
+          "--model-path", "$(MODEL_PATH)",
+          "--port", "$(PORT)",
+          "--host", "$(HOST)"
+        ]
         env:
+        - name: MODEL_ID
+          valueFrom:
+            configMapKeyRef:
+              name: {deployment_name}-config
+              key: MODEL_ID
+        - name: MODEL_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: {deployment_name}-config
+              key: MODEL_PATH
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: {deployment_name}-config
+              key: PORT
+        - name: HOST
+          valueFrom:
+            configMapKeyRef:
+              name: {deployment_name}-config
+              key: HOST
         - name: NVIDIA_VISIBLE_DEVICES
           value: "all"
-        - name: OLLAMA_HOST
-          value: "0.0.0.0"
+        ports:
+        - containerPort: {settings.sglang_port}
         resources:
           requests:
-            cpu: {resource_reqs.get('cpu', '2')}
-            memory: {resource_reqs.get('memory', '8Gi')}
+            cpu: {resource_reqs.get('cpu', '4')}
+            memory: {resource_reqs.get('memory', '16Gi')}
 """
         
         # Add GPU resources if enabled
@@ -847,46 +871,46 @@ spec:
           limits:
             nvidia.com/gpu: {gpu_reqs.get('gpu', '1')}
         volumeMounts:
-        - name: ollama-models
-          mountPath: /root/.ollama
+        - name: model-storage
+          mountPath: {settings.huggingface_cache_dir}
         livenessProbe:
           httpGet:
-            path: /
-            port: 11434
-          initialDelaySeconds: 30
+            path: /health
+            port: {settings.sglang_port}
+          initialDelaySeconds: 60
           periodSeconds: 30
         readinessProbe:
           httpGet:
-            path: /
-            port: 11434
-          initialDelaySeconds: 10
+            path: /health
+            port: {settings.sglang_port}
+          initialDelaySeconds: 30
           periodSeconds: 10
       volumes:
-      - name: ollama-models
+      - name: model-storage
         persistentVolumeClaim:
           claimName: {deployment_name}-models-pvc
 """
         else:
             deployment_yaml += f"""          limits:
-            cpu: {resource_reqs.get('cpu', '4')}
-            memory: {resource_reqs.get('memory', '16Gi')}
+            cpu: {resource_reqs.get('cpu', '8')}
+            memory: {resource_reqs.get('memory', '32Gi')}
         volumeMounts:
-        - name: ollama-models
-          mountPath: /root/.ollama
+        - name: model-storage
+          mountPath: {settings.huggingface_cache_dir}
         livenessProbe:
           httpGet:
-            path: /
-            port: 11434
-          initialDelaySeconds: 30
+            path: /health
+            port: {settings.sglang_port}
+          initialDelaySeconds: 60
           periodSeconds: 30
         readinessProbe:
           httpGet:
-            path: /
-            port: 11434
-          initialDelaySeconds: 10
+            path: /health
+            port: {settings.sglang_port}
+          initialDelaySeconds: 30
           periodSeconds: 10
       volumes:
-      - name: ollama-models
+      - name: model-storage
         emptyDir: {{}}
 """
         
@@ -900,14 +924,15 @@ spec:
   selector:
     app: {deployment_name}
   ports:
-  - port: 11434
-    targetPort: 11434
+  - port: {settings.sglang_port}
+    targetPort: {settings.sglang_port}
   type: ClusterIP
 """
         
         return {
             "namespace": namespace_yaml,
             "pvc": pvc_yaml,
+            "configmap": configmap_yaml,
             "deployment": deployment_yaml,
             "service": service_yaml
         }

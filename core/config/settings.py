@@ -5,10 +5,11 @@ from typing import Optional, List
 class Settings(BaseSettings):
     # LLM Configuration
     openai_api_key: Optional[str] = None  # Optional for production
-    llm_model: str = "qwen2.5:7b"  # Default Ollama model for development
+    llm_model: str = "qwen2.5:7b"  # Default model for development
     llm_temperature: float = 0.7
-    ollama_base_url: str = "http://127.0.0.1:11434"  # Ollama endpoint for development
-    vllm_base_url: str = "http://localhost:8000/v1"  # vLLM endpoint for production
+    ollama_base_url: Optional[str] = None  # Deprecated - using HuggingFace + SGLang
+    sglang_base_url: str = "http://localhost:8000"  # SGLang endpoint for inference
+    huggingface_model_id: str = "microsoft/Phi-3-mini-4k-instruct"  # Default HuggingFace model
 
     # Database Configuration
     database_url: Optional[str] = None  # Optional for initial testing
@@ -23,6 +24,13 @@ class Settings(BaseSettings):
     # Hugging Face Configuration
     huggingface_token: Optional[str] = None  # Optional for accessing private models
     huggingface_model_id: Optional[str] = None  # Default model ID for testing
+    huggingface_cache_dir: str = "/models"  # Local cache for downloaded models
+    
+    # SGLang Configuration
+    sglang_image: str = "lmsysorg/sglang:latest"
+    sglang_port: int = 8000
+    sglang_host: str = "0.0.0.0"
+    sglang_model_path: str = "/models/phi3-mini"
 
     # Podman Configuration
     podman_socket: str = "unix:///run/podman/podman.sock"
