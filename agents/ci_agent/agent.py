@@ -414,9 +414,11 @@ Consider the model characteristics and infrastructure constraints when designing
         """
         workflows = {}
         model_id = state['model_id']
+        safe_model_id = sanitize_model_name(model_id)
         
         for workflow in pipeline_design.get('workflows', []):
-            workflow_name = workflow['workflow_name']
+            # Sanitize workflow name from LLM
+            workflow_name = sanitize_model_name(workflow['workflow_name'])
             yaml_content = self._generate_workflow_yaml(workflow, model_id)
             workflows[workflow_name] = yaml_content
         

@@ -73,23 +73,18 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
     def _init_kubernetes_client(self):
         """Initialize Kubernetes client from kubeconfig"""
         try:
-            # Set KUBECONFIG environment variable only if path is provided
-            if settings.kubeconfig_path:
-                os.environ['KUBECONFIG'] = settings.kubeconfig_path
-                config.load_kube_config(config_file=settings.kubeconfig_path)
+            # Force use of workspace kubeconfig with correct IP
+            workspace_config = "/workspaces/AgenticPipeline/.kube/config"
+            if os.path.exists(workspace_config):
+                config.load_kube_config(config_file=workspace_config)
+                logger.info(f"Loaded kubeconfig from {workspace_config}")
             else:
-                # Try default kubeconfig first
-                try:
+                # Fallback to default
+                if settings.kubeconfig_path:
+                    os.environ['KUBECONFIG'] = settings.kubeconfig_path
+                    config.load_kube_config(config_file=settings.kubeconfig_path)
+                else:
                     config.load_kube_config()
-                except Exception as e:
-                    # Fallback to workspace kubeconfig
-                    logger.warning(f"Default kubeconfig failed: {e}, trying workspace kubeconfig")
-                    workspace_config = "/workspaces/AgenticPipeline/.kube/config"
-                    if os.path.exists(workspace_config):
-                        config.load_kube_config(config_file=workspace_config)
-                        logger.info(f"Loaded kubeconfig from {workspace_config}")
-                    else:
-                        raise
             
             # Initialize API clients
             self.core_v1 = client.CoreV1Api()
@@ -282,8 +277,17 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
                 "error": str(e)
             }
     
-    def _check_huggingface(self) -> Dict[str, Any]:
-        """Check Hugging Face connectivity"""
+    def _check_huggingface(self, state: AgentState) -> Dict[str, Any]:
+        """Check Hugging Face connectivity (skip for local Ollama models)"""
+        # Skip Hugging Face check for local Ollama models
+        model_id = state.get('model_id', '')
+        if ':' in model_id and not '/' in model_id:  # Ollama model format
+            logger.info(f"Skipping Hugging Face check for local Ollama model: {model_id}")
+            return {
+                "available": False,
+                "reason": "Using local Ollama model"
+            }
+        
         try:
             # Test with a simple model info request
             model_info = self.huggingface_client.get_model_info("Qwen/Qwen2.5-7B")
@@ -313,7 +317,7 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
             "gpu_host": self._check_gpu_host(),
             "gpu_kubernetes": self._check_gpu_kubernetes(),
             "vllm": self._check_vllm(),
-            "huggingface": self._check_huggingface()
+            "huggingface": self._check_huggingface(state)
         }
         
         # Update state
@@ -500,10 +504,15 @@ Constraint Resolver Report: {state.get('constraint_resolver_report', 'Not availa
             logger.warning("ArgoCD not available")
         
         try:
-            # Check Hugging Face connectivity
-            model_info = self.huggingface_client.get_model_info("Qwen/Qwen2.5-7B")
-            infrastructure_status["huggingface"] = True
-            logger.info("Hugging Face accessible")
+            # Check Hugging Face connectivity (skip for local Ollama models)
+            model_id = state.get('model_id', '')
+            if ':' in model_id and not '/' in model_id:  # Ollama model format
+                logger.info(f"Skipping Hugging Face check for local Ollama model: {model_id}")
+                infrastructure_status["huggingface"] = False
+            else:
+                model_info = self.huggingface_client.get_model_info("Qwen/Qwen2.5-7B")
+                infrastructure_status["huggingface"] = True
+                logger.info("Hugging Face accessible")
         except:
             logger.warning("Hugging Face not accessible")
         

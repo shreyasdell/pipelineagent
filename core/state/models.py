@@ -12,7 +12,7 @@ class AgentState(TypedDict):
     deployment_conversation_id: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     
     # Input parameters
-    model_id: str
+    model_id: Annotated[str, lambda a, b: b or a]  # Last writer wins
     model_artifact: Optional[ModelArtifact] = None  # Full model artifact with files
     model_source_path: Optional[str] = None  # Path to model files
     latency_requirement: Optional[str] = None

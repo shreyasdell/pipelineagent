@@ -112,7 +112,7 @@ class GitHubManifestManager:
                 logger.info(f"Created blob for {manifest_type}: {blob_sha}")
             
             # Create tree
-            tree_result = self.github_client.create_tree(repo, tree_items, base_tree=base_sha)
+            tree_result = self.github_client.create_tree(tree_items, base_tree=base_sha)
             if not tree_result:
                 logger.error("Failed to create Git tree")
                 return {
