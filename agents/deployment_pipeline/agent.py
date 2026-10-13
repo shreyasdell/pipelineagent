@@ -383,10 +383,15 @@ Consider the model characteristics, infrastructure constraints, and serving requ
         model_deployment = pipeline_design.get("model_deployment", {})
         serving_config = pipeline_design.get("serving_config", {})
         
+        # Calculate paths separately to avoid nested f-strings
+        default_model_path = f'/models/{model_id.replace("/", "-")}'
+        model_path = model_deployment.get('download_path', default_model_path)
+        log_file = f"/var/log/vllm/{model_id.replace('/', '-')}.log"
+        
         return f"""# vLLM Configuration for {model_id}
 [model]
 model_id = "{model_id}"
-model_path = "{model_deployment.get('download_path', f'/models/{model_id.replace('/', "-')}')}"
+model_path = "{model_path}"
 
 [serving]
 host = "0.0.0.0"
@@ -401,7 +406,7 @@ max_num_batched_tokens = 4096
 
 [logging]
 log_level = "INFO"
-log_file = "/var/log/vllm/{model_id.replace('/', '-')}.log"
+log_file = "{log_file}"
 """
     
     def _generate_deployment_script(self, pipeline_design: Dict[str, Any], model_id: str) -> str:
@@ -409,13 +414,16 @@ log_file = "/var/log/vllm/{model_id.replace('/', '-')}.log"
         model_deployment = pipeline_design.get("model_deployment", {})
         serving_config = pipeline_design.get("serving_config", {})
         
+        # Pre-compute the model path to avoid nested f-string
+        model_path = model_deployment.get('download_path', f'/models/{model_id.replace("/", "-")}')
+        
         return f"""#!/bin/bash
 # Deployment script for {model_id}
 
 set -e
 
 MODEL_ID="{model_id}"
-MODEL_PATH="{model_deployment.get('download_path', f'/models/{model_id.replace('/', "-')}')}"
+MODEL_PATH="{model_path}"
 VLLM_PORT={serving_config.get('port', 8000)}
 GPU_MEMORY_UTIL={serving_config.get('gpu_memory_utilization', 0.9)}
 MAX_MODEL_LEN={serving_config.get('max_model_len', 4096)}
