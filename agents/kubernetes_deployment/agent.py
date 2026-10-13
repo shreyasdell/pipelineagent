@@ -78,7 +78,18 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
                 os.environ['KUBECONFIG'] = settings.kubeconfig_path
                 config.load_kube_config(config_file=settings.kubeconfig_path)
             else:
-                config.load_kube_config()  # Use default kubeconfig
+                # Try default kubeconfig first
+                try:
+                    config.load_kube_config()
+                except Exception as e:
+                    # Fallback to workspace kubeconfig
+                    logger.warning(f"Default kubeconfig failed: {e}, trying workspace kubeconfig")
+                    workspace_config = "/workspaces/AgenticPipeline/.kube/config"
+                    if os.path.exists(workspace_config):
+                        config.load_kube_config(config_file=workspace_config)
+                        logger.info(f"Loaded kubeconfig from {workspace_config}")
+                    else:
+                        raise
             
             # Initialize API clients
             self.core_v1 = client.CoreV1Api()

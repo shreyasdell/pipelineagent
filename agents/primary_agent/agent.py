@@ -11,6 +11,22 @@ from core.config.settings import settings
 from loguru import logger
 
 
+def sanitize_model_name(model_id: str) -> str:
+    """
+    Sanitize model name for use in file paths and URLs.
+    Replaces colons, slashes, and other special characters with hyphens.
+    
+    Args:
+        model_id: Original model identifier (e.g., "phi3:mini" or "microsoft/phi-3")
+        
+    Returns:
+        Sanitized model name (e.g., "phi3-mini" or "microsoft-phi-3")
+    """
+    # Replace colons, slashes, and other special characters with hyphens
+    sanitized = model_id.replace(':', '-').replace('/', '-').replace('_', '-')
+    return sanitized
+
+
 class PrimaryAgent:
     """
     Primary Agent - Orchestrates end-to-end model deployment pipelines
@@ -361,14 +377,15 @@ Consider the constraint resolver recommendations when creating tasks.
                 "status": "completed"
             }
         elif task_type == "deployment_pipeline_agent":
+            safe_model_id = sanitize_model_name(model_id)
             return {
                 "deployment_id": f"deploy-{model_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                "argocd_application": f"{model_id.replace('_', '-')}",
+                "argocd_application": safe_model_id,
                 "kubernetes_manifests": {
-                    "deployment": f"deployment/{model_id}.yaml",
-                    "service": f"service/{model_id}.yaml"
+                    "deployment": f"deployment/{safe_model_id}.yaml",
+                    "service": f"service/{safe_model_id}.yaml"
                 },
-                "container_image": f"{settings.default_organization}/{model_id}:latest",
+                "container_image": f"{settings.default_organization}/{safe_model_id}:latest",
                 "argocd_verification": {
                     "overall_status": "success" if settings.argocd_url else "argocd_not_configured",
                     "all_indicators_positive": True if settings.argocd_url else False,

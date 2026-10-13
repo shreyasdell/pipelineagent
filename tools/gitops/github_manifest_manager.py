@@ -5,6 +5,22 @@ from tools.github.github_client import GitHubClient
 from loguru import logger
 
 
+def sanitize_model_name(model_id: str) -> str:
+    """
+    Sanitize model name for use in file paths and URLs.
+    Replaces colons, slashes, and other special characters with hyphens.
+    
+    Args:
+        model_id: Original model identifier (e.g., "phi3:mini" or "microsoft/phi-3")
+        
+    Returns:
+        Sanitized model name (e.g., "phi3-mini" or "microsoft-phi-3")
+    """
+    # Replace colons, slashes, and other special characters with hyphens
+    sanitized = model_id.replace(':', '-').replace('/', '-').replace('_', '-')
+    return sanitized
+
+
 class GitHubManifestManager:
     """
     GitHub Manifest Manager - Handles GitOps operations for Kubernetes manifests
@@ -55,7 +71,7 @@ class GitHubManifestManager:
             }
         
         target_branch = branch or self.default_branch
-        safe_model_id = model_id.replace('_', '-').replace('/', '-')
+        safe_model_id = sanitize_model_name(model_id)
         manifest_dir = f"{self.manifests_path}/{safe_model_id}"
         
         try:
@@ -81,7 +97,7 @@ class GitHubManifestManager:
             for manifest_type, manifest_content in manifests.items():
                 file_path = f"{manifest_dir}/{manifest_type}.yaml"
                 # Create blob for each manifest
-                blob_result = self.github_client.create_blob(repo, manifest_content)
+                blob_result = self.github_client.create_blob(manifest_content)
                 if not blob_result:
                     logger.error(f"Failed to create blob for {manifest_type}")
                     continue
@@ -247,7 +263,7 @@ class GitHubManifestManager:
                 "model_id": model_id
             }
         
-        safe_model_id = model_id.replace('_', '-').replace('/', '')
+        safe_model_id = sanitize_model_name(model_id)
         branch_name = f"deploy-{safe_model_id}"
         
         try:

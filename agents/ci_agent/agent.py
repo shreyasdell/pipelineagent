@@ -11,6 +11,22 @@ from tools.github.github_client import GitHubClient
 from loguru import logger
 
 
+def sanitize_model_name(model_id: str) -> str:
+    """
+    Sanitize model name for use in file paths and URLs.
+    Replaces colons, slashes, and other special characters with hyphens.
+    
+    Args:
+        model_id: Original model identifier (e.g., "phi3:mini" or "microsoft/phi-3")
+        
+    Returns:
+        Sanitized model name (e.g., "phi3-mini" or "microsoft-phi-3")
+    """
+    # Replace colons, slashes, and other special characters with hyphens
+    sanitized = model_id.replace(':', '-').replace('/', '-').replace('_', '-')
+    return sanitized
+
+
 class CIAgent:
     """
     CI Agent - Creates GitHub Actions pipelines for CI/CD
@@ -278,12 +294,13 @@ Consider the model characteristics and infrastructure constraints when designing
             Default pipeline design
         """
         deployment_type = state.get('deployment_type', 'standard')
+        safe_model_id = sanitize_model_name(state['model_id'])
         
         return {
             "reasoning": f"Standard CI/CD pipeline for {deployment_type} deployment of {state['model_id']}",
             "workflows": [
                 {
-                    "workflow_name": "build-and-test",
+                    "workflow_name": f"{safe_model_id}-build-and-test",
                     "trigger_events": ["push", "pull_request"],
                     "stages": [
                         {
@@ -332,7 +349,7 @@ Consider the model characteristics and infrastructure constraints when designing
                     ]
                 },
                 {
-                    "workflow_name": "deploy",
+                    "workflow_name": f"{safe_model_id}-deploy",
                     "trigger_events": ["push", "workflow_dispatch"],
                     "stages": [
                         {
@@ -346,7 +363,7 @@ Consider the model characteristics and infrastructure constraints when designing
                                             "step_name": "deploy",
                                             "action": "shell",
                                             "parameters": {
-                                                "command": f"kubectl apply -f deployment/staging/{state['model_id']}.yaml"
+                                                "command": f"kubectl apply -f deployment/staging/{safe_model_id}.yaml"
                                             }
                                         }
                                     ]
@@ -364,7 +381,7 @@ Consider the model characteristics and infrastructure constraints when designing
                                             "step_name": "deploy",
                                             "action": "shell",
                                             "parameters": {
-                                                "command": f"kubectl apply -f deployment/production/{state['model_id']}.yaml"
+                                                "command": f"kubectl apply -f deployment/production/{safe_model_id}.yaml"
                                             }
                                         }
                                     ]
@@ -502,7 +519,7 @@ Consider the model characteristics and infrastructure constraints when designing
         try:
             # Create a feature branch for CI pipeline changes
             # Sanitize model ID for branch name (remove special characters)
-            safe_model_id = state['model_id'].replace('/', '-').replace(':', '-').replace('_', '-')
+            safe_model_id = sanitize_model_name(state['model_id'])
             branch_name = f"ci-pipeline-{safe_model_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
             try:
                 self.github_client.create_branch(branch_name)

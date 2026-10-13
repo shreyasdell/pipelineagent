@@ -1,6 +1,7 @@
 from typing import TypedDict, Annotated, Optional, List, Dict, Any
 from langgraph.graph.message import add_messages
 from core.models.model_artifact import ModelArtifact
+import operator
 
 
 class AgentState(TypedDict):
@@ -8,7 +9,7 @@ class AgentState(TypedDict):
     
     # Conversation management
     messages: Annotated[list, add_messages]
-    deployment_conversation_id: Optional[str] = None  # Only set once by Primary Agent
+    deployment_conversation_id: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     
     # Input parameters
     model_id: str
@@ -42,25 +43,25 @@ class AgentState(TypedDict):
     argocd_application: Optional[Dict[str, Any]] = None
     
     # ArgoCD/GitOps specific
-    argocd_status: Optional[Dict[str, Any]] = None
+    argocd_status: Annotated[Optional[Dict[str, Any]], lambda a, b: {**(a or {}), **(b or {})}]  # Merge dicts
     gitops_repository: Optional[str] = None
     gitops_branch: Optional[str] = None
     gitops_commit_sha: Optional[str] = None
-    argocd_sync_status: Optional[str] = None
-    argocd_health_status: Optional[str] = None
+    argocd_sync_status: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
+    argocd_health_status: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     
     # Observability outputs (deferred for future phase)
     observability_report: Optional[Dict[str, Any]] = None
     
     # State machine tracking
-    current_state: Optional[str] = None  # Current state in workflow
-    state_history: Optional[List[Dict[str, Any]]] = None  # State transition history
+    current_state: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
+    state_history: Annotated[Optional[List[Dict[str, Any]]], lambda a, b: (a or []) + (b or [])]  # Append lists
     deployment_type_decision: Optional[str] = None  # "local" or "kubernetes"
     infrastructure_available: Optional[Dict[str, bool]] = None  # What infrastructure is available
     
     # Error handling
-    errors: List[str] = []
-    current_agent: Optional[str] = None
+    errors: Annotated[List[str], operator.add]  # Accumulate errors
+    current_agent: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     retry_count: int = 0
     max_retries: int = 3
 
