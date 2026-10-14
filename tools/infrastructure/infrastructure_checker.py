@@ -1,21 +1,22 @@
 from typing import Dict, Any, Optional
 import subprocess
+import os
 from loguru import logger
 
 
 class InfrastructureChecker:
     """
     Infrastructure Checker - Verifies infrastructure prerequisites for deployment
-    Checks MicroK8s, GPU, ArgoCD, vLLM, and Hugging Face availability
+    Checks MicroK8s, GPU, ArgoCD, SGLang, and Hugging Face availability
     """
-    
+
     def __init__(self):
         self.checks = {
             "microk8s": self._check_microk8s,
             "kubectl": self._check_kubectl,
             "gpu": self._check_gpu,
             "argocd": self._check_argocd,
-            "vllm": self._check_vllm,
+            "sglang": self._check_vllm,  # Method name kept for compatibility
             "huggingface": self._check_huggingface
         }
     
@@ -50,12 +51,28 @@ class InfrastructureChecker:
     def _check_microk8s(self) -> Dict[str, Any]:
         """Check MicroK8s availability and status"""
         try:
+            # Set KUBECONFIG to use correct config
+            kubeconfig_paths = [
+                os.environ.get('KUBECONFIG'),
+                os.path.expanduser("~/.kube/config"),
+                "/workspaces/AgenticPipeline/.kube/config",
+                "/mnt/c/Users/Shreyas_DK/.kube/config",
+            ]
+
+            env = os.environ.copy()
+            for path in kubeconfig_paths:
+                if path and os.path.exists(path):
+                    env['KUBECONFIG'] = path
+                    logger.info(f"Using kubeconfig: {path}")
+                    break
+
             # Try to access MicroK8s via kubectl
             result = subprocess.run(
                 ["kubectl", "cluster-info"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                env=env
             )
             
             if result.returncode == 0:
@@ -64,7 +81,8 @@ class InfrastructureChecker:
                     ["kubectl", "get", "nodes", "-o", "jsonpath={.items[*].status.conditions[*].type}"],
                     capture_output=True,
                     text=True,
-                    timeout=10
+                    timeout=10,
+                    env=env
                 )
                 
                 return {
@@ -100,11 +118,26 @@ class InfrastructureChecker:
     def _check_kubectl(self) -> Dict[str, Any]:
         """Check kubectl availability and version"""
         try:
+            # Set KUBECONFIG to use correct config
+            kubeconfig_paths = [
+                os.environ.get('KUBECONFIG'),
+                os.path.expanduser("~/.kube/config"),
+                "/workspaces/AgenticPipeline/.kube/config",
+                "/mnt/c/Users/Shreyas_DK/.kube/config",
+            ]
+
+            env = os.environ.copy()
+            for path in kubeconfig_paths:
+                if path and os.path.exists(path):
+                    env['KUBECONFIG'] = path
+                    break
+
             result = subprocess.run(
                 ["kubectl", "version", "--client"],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                env=env
             )
             
             if result.returncode == 0:
@@ -218,25 +251,24 @@ class InfrastructureChecker:
             }
     
     def _check_vllm(self) -> Dict[str, Any]:
-        """Check vLLM installation and availability"""
+        """Check SGLang installation and availability (replaces vLLM)"""
         try:
-            import vllm
-            version = vllm.__version__
+            import sglang
             return {
                 "available": True,
-                "reason": "vLLM installed",
-                "details": f"vLLM version {version}"
+                "reason": "SGLang installed",
+                "details": "SGLang supports newer GPU architectures like Blackwell"
             }
         except ImportError:
             return {
                 "available": False,
-                "reason": "vLLM not installed",
-                "details": "vllm package not found in Python environment"
+                "reason": "SGLang not installed",
+                "details": "sglang package not found in Python environment - run: pip install sglang[all]"
             }
         except Exception as e:
             return {
                 "available": False,
-                "reason": f"vLLM check failed: {str(e)}",
+                "reason": f"SGLang check failed: {str(e)}",
                 "details": ""
             }
     
@@ -268,10 +300,10 @@ class InfrastructureChecker:
     def _determine_deployment_type(self, results: Dict[str, Any]) -> str:
         """
         Determine recommended deployment type based on infrastructure availability
-        
+
         Args:
             results: Infrastructure check results
-            
+
         Returns:
             Recommended deployment type: "kubernetes" or "local"
         """
@@ -281,10 +313,10 @@ class InfrastructureChecker:
             results.get("kubectl", {}).get("available", False),
             results.get("gpu", {}).get("available", False)
         ]
-        
+
         if all(kubernetes_requirements):
             return "kubernetes"
-        elif results.get("gpu", {}).get("available", False) and results.get("vllm", {}).get("available", False):
+        elif results.get("gpu", {}).get("available", False) and results.get("sglang", {}).get("available", False):
             return "local"
         else:
             return "insufficient_infrastructure"
@@ -292,10 +324,10 @@ class InfrastructureChecker:
     def get_deployment_prerequisites(self, deployment_type: str) -> Dict[str, Any]:
         """
         Get prerequisites for a specific deployment type
-        
+
         Args:
             deployment_type: "kubernetes" or "local"
-            
+
         Returns:
             Dictionary of prerequisites and their status
         """
@@ -315,7 +347,7 @@ class InfrastructureChecker:
             return {
                 "required": {
                     "gpu": "NVIDIA GPU with drivers installed",
-                    "vllm": "vLLM installed in Python environment",
+                    "sglang": "SGLang installed in Python environment",
                     "huggingface": "Hugging Face API access"
                 },
                 "optional": {}
