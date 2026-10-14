@@ -14,9 +14,9 @@ class AgentState(TypedDict):
     # Input parameters
     model_id: Annotated[str, lambda a, b: b or a]  # Last writer wins
     model_artifact: Optional[ModelArtifact] = None  # Full model artifact with files
-    model_source_path: Optional[str] = None  # Path to model files
-    latency_requirement: Optional[str] = None
-    deployment_type: Optional[str] = None
+    model_source_path: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
+    latency_requirement: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
+    deployment_type: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     infrastructure_details: Optional[Dict[str, Any]] = None
     
     # Primary Agent outputs

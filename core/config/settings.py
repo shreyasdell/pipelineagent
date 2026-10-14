@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     huggingface_token: Optional[str] = None  # Optional for accessing private models
     huggingface_model_id: Optional[str] = None  # Default model ID for testing
     huggingface_cache_dir: str = "/models"  # Local cache for downloaded models
+    huggingface_use_auth_token: bool = False  # Whether to use auth token for downloads
     
     # SGLang Configuration
     sglang_image: str = "lmsysorg/sglang:latest"

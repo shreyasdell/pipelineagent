@@ -1,5 +1,7 @@
 from typing import Dict, Any, Optional, List
 import requests
+import os
+from pathlib import Path
 from core.config.settings import settings
 from loguru import logger
 
@@ -315,3 +317,80 @@ class HuggingFaceClient:
         """Calculate total size of model files in GB"""
         total_bytes = sum(f.get("size", 0) for f in files)
         return round(total_bytes / (1024**3), 2)  # Convert to GB
+
+    def download_model(
+        self,
+        model_id: str,
+        local_dir: Optional[str] = None,
+        use_auth_token: Optional[bool] = None
+    ) -> Dict[str, Any]:
+        """
+        Download model from Hugging Face to local directory
+
+        Args:
+            model_id: Model identifier (e.g., "microsoft/Phi-3-mini-4k-instruct")
+            local_dir: Local directory to download to (defaults to settings.huggingface_cache_dir)
+            use_auth_token: Whether to use auth token (defaults to settings.huggingface_use_auth_token)
+
+        Returns:
+            Download result with status and local path
+        """
+        try:
+            from huggingface_hub import snapshot_download
+
+            target_dir = local_dir or settings.huggingface_cache_dir
+            use_auth = use_auth_token if use_auth_token is not None else settings.huggingface_use_auth_token
+            token = self.token if use_auth else None
+
+            # Create target directory if it doesn't exist
+            Path(target_dir).mkdir(parents=True, exist_ok=True)
+
+            logger.info(f"Downloading model {model_id} to {target_dir}...")
+            logger.info(f"Using auth token: {use_auth}")
+
+            # Download model using huggingface_hub
+            local_path = snapshot_download(
+                repo_id=model_id,
+                local_dir=target_dir,
+                local_dir_use_symlinks=False,
+                token=token,
+                resume_download=True
+            )
+
+            logger.info(f"Model downloaded successfully to {local_path}")
+
+            return {
+                "status": "success",
+                "model_id": model_id,
+                "local_path": local_path,
+                "size_gb": self._calculate_directory_size(local_path)
+            }
+
+        except ImportError:
+            logger.error("huggingface_hub not installed. Install with: pip install huggingface_hub")
+            return {
+                "status": "error",
+                "reason": "huggingface_hub not installed",
+                "model_id": model_id
+            }
+        except Exception as e:
+            logger.error(f"Failed to download model {model_id}: {e}")
+            return {
+                "status": "error",
+                "reason": str(e),
+                "model_id": model_id
+            }
+
+    def _calculate_directory_size(self, directory: str) -> float:
+        """Calculate total size of directory in GB"""
+        total_bytes = 0
+        try:
+            for dirpath, dirnames, filenames in os.walk(directory):
+                for filename in filenames:
+                    filepath = os.path.join(dirpath, filename)
+                    if os.path.exists(filepath):
+                        total_bytes += os.path.getsize(filepath)
+            return round(total_bytes / (1024**3), 2)
+        except Exception as e:
+            logger.error(f"Failed to calculate directory size: {e}")
+            return 0.0

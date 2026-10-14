@@ -130,7 +130,6 @@ class GitHubManifestManager:
             final_message = commit_message or default_message
             
             commit_result = self.github_client.create_commit(
-                repo,
                 message=final_message,
                 tree=tree_sha,
                 parents=[base_sha]

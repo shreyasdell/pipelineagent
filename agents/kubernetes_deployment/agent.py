@@ -18,10 +18,10 @@ from kubernetes import client, config
 
 class KubernetesDeploymentAgent:
     """
-    Kubernetes Deployment Agent - Handles Kubernetes deployment for vLLM serving
+    Kubernetes Deployment Agent - Handles Kubernetes deployment for SGLang serving
     Manages MicroK8s deployment, manifest generation, and ArgoCD integration
     """
-    
+
     def __init__(self):
         self.llm = get_llm()
         self.argocd_client = ArgoCDClient()
@@ -29,12 +29,12 @@ class KubernetesDeploymentAgent:
         self.github_manifest_manager = GitHubManifestManager()
         self._init_kubernetes_client()
         self.system_prompt = """You are a Kubernetes Deployment Agent for AI model deployment.
-Your task is to handle Kubernetes deployment for vLLM serving on MicroK8s.
+Your task is to handle Kubernetes deployment for SGLang serving on MicroK8s.
 
 You need to:
 1. Analyze deployment requirements and infrastructure details
-2. Design Kubernetes deployment configuration for vLLM serving
-3. Generate Kubernetes manifests (Deployment, Service, ConfigMap)
+2. Design Kubernetes deployment configuration for SGLang serving
+3. Generate Kubernetes manifests (Deployment, Service, ConfigMap, PVC)
 4. Create ArgoCD application configuration when available
 5. Verify deployment status and health indicators
 
@@ -52,13 +52,12 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
             "gpu_memory_gb": <memory in GB>,
             "nvidia_device_plugin": <boolean>
         }},
-        "vllm_configuration": {{
+        "sglang_configuration": {{
             "model_path": "<model path>",
             "model_id": "<model ID>",
-            "port": <port number>,
-            "gpu_memory_utilization": <percentage>,
-            "max_model_len": <context length>,
-            "tensor_parallel_size": <number>
+            "port": <port number, typically 8000>,
+            "host": "<host, typically 0.0.0.0>",
+            "context_length": <context length>
         }},
         "resource_requirements": {{
             "cpu": "<CPU request>",
@@ -79,18 +78,14 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
                 config.load_kube_config(config_file=workspace_config)
                 logger.info(f"Loaded kubeconfig from {workspace_config}")
             else:
-                # Fallback to default
-                if settings.kubeconfig_path:
-                    os.environ['KUBECONFIG'] = settings.kubeconfig_path
-                    config.load_kube_config(config_file=settings.kubeconfig_path)
-                else:
-                    config.load_kube_config()
-            
+                logger.error(f"Workspace kubeconfig not found at {workspace_config}")
+                raise FileNotFoundError(f"Kubeconfig not found at {workspace_config}")
+
             # Initialize API clients
             self.core_v1 = client.CoreV1Api()
             self.apps_v1 = client.AppsV1Api()
             self.custom_objects_api = client.CustomObjectsApi()
-            
+
             logger.info("Kubernetes client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Kubernetes client: {e}")
