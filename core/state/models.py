@@ -66,12 +66,12 @@ class AgentState(TypedDict):
     state_history: Annotated[Optional[List[Dict[str, Any]]], lambda a, b: (a or []) + (b or [])]  # Append lists
     deployment_type_decision: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     infrastructure_available: Annotated[Optional[Dict[str, bool]], merge_dicts]  # Merge dicts
-    
+
     # Error handling
     errors: Annotated[List[str], operator.add]  # Accumulate errors
     current_agent: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
-    retry_count: int = 0
-    max_retries: int = 3
+    retry_count: Annotated[int, lambda a, b: max(a, b)]  # Take max value
+    max_retries: Annotated[int, lambda a, b: max(a, b)]  # Take max value
 
 
 class ConstraintResolverReport(TypedDict):

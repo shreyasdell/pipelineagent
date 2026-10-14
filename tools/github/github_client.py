@@ -75,24 +75,28 @@ class GitHubClient:
     def create_workflow_file(self, workflow_name: str, workflow_content: str, branch: str = "main") -> Dict[str, Any]:
         """
         Create or update a GitHub Actions workflow file in the repository
-        
+
         Args:
             workflow_name: Name of the workflow file (without .yaml extension)
             workflow_content: YAML content of the workflow
             branch: Branch to create the file on
-            
+
         Returns:
             Response from GitHub API
         """
         if not self.repo:
             raise ValueError("GitHub repository not configured")
-        
+
+        # Sanitize workflow name (remove spaces, special chars)
+        sanitized_name = workflow_name.lower().replace(' ', '-').replace('_', '-')
+        sanitized_name = ''.join(c for c in sanitized_name if c.isalnum() or c in '-.')
+
         # Encode content to base64
         encoded_content = base64.b64encode(workflow_content.encode()).decode()
-        
+
         # File path for GitHub Actions workflow
-        file_path = f".github/workflows/{workflow_name}.yaml"
-        
+        file_path = f".github/workflows/{sanitized_name}.yaml"
+
         # First, check if file exists to get SHA
         endpoint = f"/repos/{self.repo}/contents/{file_path}"
         try:
@@ -102,21 +106,21 @@ class GitHubClient:
         except:
             sha = None
             logger.info(f"Creating new workflow file: {file_path}")
-        
+
         # Create or update file
         data = {
-            "message": f"Add/update CI workflow: {workflow_name}",
+            "message": f"Add/update CI workflow: {sanitized_name}",
             "content": encoded_content,
             "branch": branch
         }
-        
+
         if sha:
             data["sha"] = sha
-        
+
         endpoint = f"/repos/{self.repo}/contents/{file_path}"
         response = self._make_request("PUT", endpoint, data)
-        
-        logger.info(f"Workflow file {workflow_name}.yaml created/updated successfully")
+
+        logger.info(f"Workflow file {sanitized_name}.yaml created/updated successfully")
         return response
     
     def get_workflow_runs(self, workflow_name: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -428,17 +432,17 @@ class GitHubClient:
     def get_branch(self, branch: str) -> Dict[str, Any]:
         """
         Get branch information
-        
+
         Args:
             branch: Branch name
-            
+
         Returns:
             Branch information
         """
         if not self.repo:
             raise ValueError("GitHub repository not configured")
-        
-        endpoint = f"/repos/{self.repo}/git/refs/heads/{branch}"
+
+        endpoint = f"/repos/{self.repo}/branches/{branch}"
         return self._make_request("GET", endpoint)
     
     def get_commit(self, commit_sha: str) -> Dict[str, Any]:

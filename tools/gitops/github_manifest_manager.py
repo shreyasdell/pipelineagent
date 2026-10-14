@@ -95,6 +95,7 @@ class GitHubManifestManager:
                 base_sha = main_branch_info.get("commit", {}).get("sha")
                 if not base_sha:
                     logger.error("Failed to get main branch SHA")
+                    logger.error(f"Main branch info: {main_branch_info}")
                     return {
                         "status": "failed",
                         "reason": "Failed to get main branch SHA",
@@ -116,6 +117,13 @@ class GitHubManifestManager:
                 logger.info(f"Created branch {target_branch} from main")
             else:
                 base_sha = branch_info.get("commit", {}).get("sha")
+                if not base_sha:
+                    logger.error(f"Failed to get branch SHA from branch_info: {branch_info}")
+                    return {
+                        "status": "failed",
+                        "reason": "Failed to get branch SHA",
+                        "model_id": model_id
+                    }
 
             if not base_sha:
                 logger.error("Base SHA is None, cannot proceed")

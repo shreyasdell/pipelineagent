@@ -428,18 +428,21 @@ Consider the model characteristics and infrastructure constraints when designing
     def _generate_workflow_yaml(self, workflow: Dict[str, Any], model_id: str) -> str:
         """
         Generate GitHub Actions YAML for a single workflow
-        
+
         Args:
             workflow: Workflow configuration
             model_id: Model identifier
-            
+
         Returns:
             YAML content for the workflow
         """
         yaml_lines = []
-        
+
+        # Sanitize workflow name for YAML (no spaces, special chars)
+        workflow_name = sanitize_model_name(workflow['workflow_name'])
+
         # Workflow header
-        yaml_lines.append(f"name: {workflow['workflow_name']}")
+        yaml_lines.append(f"name: {workflow_name}")
         yaml_lines.append("")
         
         # Triggers
