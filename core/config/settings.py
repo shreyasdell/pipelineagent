@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ollama_base_url: Optional[str] = None  # Deprecated - using HuggingFace + SGLang
     sglang_base_url: str = "http://localhost:8000"  # SGLang endpoint for inference
     huggingface_model_id: str = "microsoft/Phi-3-mini-4k-instruct"  # Default HuggingFace model
+    vllm_base_url: Optional[str] = None  # Deprecated - using SGLang instead
 
     # Database Configuration
     database_url: Optional[str] = None  # Optional for initial testing
