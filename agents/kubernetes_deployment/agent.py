@@ -72,14 +72,31 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
     def _init_kubernetes_client(self):
         """Initialize Kubernetes client from kubeconfig"""
         try:
-            # Force use of workspace kubeconfig with correct IP
-            workspace_config = "/workspaces/AgenticPipeline/.kube/config"
-            if os.path.exists(workspace_config):
-                config.load_kube_config(config_file=workspace_config)
-                logger.info(f"Loaded kubeconfig from {workspace_config}")
-            else:
-                logger.error(f"Workspace kubeconfig not found at {workspace_config}")
-                raise FileNotFoundError(f"Kubeconfig not found at {workspace_config}")
+            # Check multiple kubeconfig locations in order
+            kubeconfig_paths = [
+                os.environ.get('KUBECONFIG'),  # Environment variable
+                os.path.expanduser("~/.kube/config"),  # Standard Linux path
+                "/workspaces/AgenticPipeline/.kube/config",  # Codespaces path
+                "/mnt/c/Users/Shreyas_DK/.kube/config",  # WSL to Windows path
+            ]
+
+            kubeconfig_loaded = False
+            for path in kubeconfig_paths:
+                if path and os.path.exists(path):
+                    config.load_kube_config(config_file=path)
+                    logger.info(f"Loaded kubeconfig from {path}")
+                    kubeconfig_loaded = True
+                    break
+
+            if not kubeconfig_loaded:
+                # Try in-cluster config as last resort
+                try:
+                    config.load_incluster_config()
+                    logger.info("Loaded in-cluster kubeconfig")
+                    kubeconfig_loaded = True
+                except Exception:
+                    logger.error("No kubeconfig found in any location")
+                    raise FileNotFoundError("No kubeconfig found. Set KUBECONFIG environment variable or place config in ~/.kube/config")
 
             # Initialize API clients
             self.core_v1 = client.CoreV1Api()
@@ -277,6 +294,12 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
         """Check Hugging Face connectivity (required for HuggingFace models)"""
         # Always check Hugging Face for HuggingFace models
         try:
+            # Check if token is available
+            if not settings.huggingface_token:
+                logger.warning("HUGGINGFACE_TOKEN not set in settings - using unauthenticated access")
+            else:
+                logger.info(f"HUGGINGFACE_TOKEN configured (length: {len(settings.huggingface_token)})")
+
             model_info = self.huggingface_client.get_model_info("microsoft/Phi-3-mini-4k-instruct")
             if model_info:
                 return {
@@ -289,6 +312,7 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
                     "error": "Failed to retrieve model info"
                 }
         except Exception as e:
+            logger.error(f"HuggingFace check failed: {e}")
             return {
                 "available": False,
                 "error": str(e)
@@ -1190,9 +1214,14 @@ spec:
                 }
             
             # Create ArgoCD application
+            # Convert owner/repo to full GitHub URL
+            repo = settings.github_repo or 'https://github.com/example/repo'
+            if not repo.startswith('http'):
+                repo = f"https://github.com/{repo}.git"
+
             app_result = self.argocd_client.create_application(
                 app_name=safe_model_id,
-                repo_url=settings.github_repo or 'https://github.com/example/repo',
+                repo_url=repo,
                 path=f"deployment/manifests/{safe_model_id}",
                 destination_server="https://kubernetes.default.svc",
                 destination_namespace=namespace,

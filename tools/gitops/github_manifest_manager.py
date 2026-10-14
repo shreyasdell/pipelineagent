@@ -79,15 +79,52 @@ class GitHubManifestManager:
             logger.info(f"Getting current branch SHA for {repo}...")
             self.github_client.repo = repo  # Set repo for the client
             branch_info = self.github_client.get_branch(target_branch)
+
             if not branch_info:
-                logger.error(f"Branch {target_branch} not found in repository")
+                # Branch doesn't exist, create it from main
+                logger.info(f"Branch {target_branch} not found, creating from main...")
+                main_branch_info = self.github_client.get_branch("main")
+                if not main_branch_info:
+                    logger.error("Main branch not found")
+                    return {
+                        "status": "failed",
+                        "reason": "Main branch not found",
+                        "model_id": model_id
+                    }
+
+                base_sha = main_branch_info.get("commit", {}).get("sha")
+                if not base_sha:
+                    logger.error("Failed to get main branch SHA")
+                    return {
+                        "status": "failed",
+                        "reason": "Failed to get main branch SHA",
+                        "model_id": model_id
+                    }
+
+                # Create the new branch
+                create_result = self.github_client.create_reference(
+                    f"refs/heads/{target_branch}",
+                    sha=base_sha
+                )
+                if not create_result:
+                    logger.error(f"Failed to create branch {target_branch}")
+                    return {
+                        "status": "failed",
+                        "reason": f"Failed to create branch {target_branch}",
+                        "model_id": model_id
+                    }
+                logger.info(f"Created branch {target_branch} from main")
+            else:
+                base_sha = branch_info.get("commit", {}).get("sha")
+
+            if not base_sha:
+                logger.error("Base SHA is None, cannot proceed")
                 return {
                     "status": "failed",
-                    "reason": f"Branch {target_branch} not found",
+                    "reason": "Base SHA is None",
                     "model_id": model_id
                 }
-            
-            base_sha = branch_info.get("commit", {}).get("sha")
+
             logger.info(f"Base SHA: {base_sha}")
             
             # Step 2: Create tree with manifest files

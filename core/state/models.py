@@ -4,6 +4,14 @@ from core.models.model_artifact import ModelArtifact
 import operator
 
 
+def merge_dicts(left: Optional[Dict[str, Any]], right: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Merge two dictionaries, with right taking precedence over left"""
+    merged = left.copy() if left else {}
+    if right:
+        merged.update(right)
+    return merged
+
+
 class AgentState(TypedDict):
     """Shared state for all agents in the LangGraph workflow"""
     
@@ -17,47 +25,47 @@ class AgentState(TypedDict):
     model_source_path: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     latency_requirement: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     deployment_type: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
-    infrastructure_details: Optional[Dict[str, Any]] = None
+    infrastructure_details: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
     
     # Primary Agent outputs
     decomposed_sub_agent_tasks: Optional[List[Dict[str, Any]]] = None  # Tasks delegated to sub-agents
-    final_deployment_report: Optional[Dict[str, Any]] = None  # Final compiled deployment report
-    
+    final_deployment_report: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
+
     # Constraint Resolver outputs
-    constraint_resolver_report: Optional[Dict[str, Any]] = None
-    
+    constraint_resolver_report: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
+
     # Inference Optimization outputs (deferred for future phase)
-    inference_optimization_report: Optional[Dict[str, Any]] = None
-    inference_optimization_status: Optional[str] = "DEFERRED"
-    
+    inference_optimization_report: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
+    inference_optimization_status: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
+
     # CI/CD outputs
-    ci_pipeline: Optional[Dict[str, Any]] = None
-    
+    ci_pipeline: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
+
     # Deployment outputs
-    deployment_report: Optional[Dict[str, Any]] = None
-    service_endpoint: Optional[str] = None
-    
+    deployment_report: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
+    service_endpoint: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
+
     # Kubernetes deployment outputs
-    kubernetes_deployment_report: Optional[Dict[str, Any]] = None
-    kubernetes_manifests: Optional[Dict[str, str]] = None
-    argocd_application: Optional[Dict[str, Any]] = None
+    kubernetes_deployment_report: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
+    kubernetes_manifests: Annotated[Optional[Dict[str, str]], merge_dicts]  # Merge dicts
+    argocd_application: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
     
     # ArgoCD/GitOps specific
-    argocd_status: Annotated[Optional[Dict[str, Any]], lambda a, b: {**(a or {}), **(b or {})}]  # Merge dicts
-    gitops_repository: Optional[str] = None
-    gitops_branch: Optional[str] = None
-    gitops_commit_sha: Optional[str] = None
+    argocd_status: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
+    gitops_repository: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
+    gitops_branch: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
+    gitops_commit_sha: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     argocd_sync_status: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     argocd_health_status: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
-    
+
     # Observability outputs (deferred for future phase)
-    observability_report: Optional[Dict[str, Any]] = None
-    
+    observability_report: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
+
     # State machine tracking
     current_state: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     state_history: Annotated[Optional[List[Dict[str, Any]]], lambda a, b: (a or []) + (b or [])]  # Append lists
-    deployment_type_decision: Optional[str] = None  # "local" or "kubernetes"
-    infrastructure_available: Optional[Dict[str, bool]] = None  # What infrastructure is available
+    deployment_type_decision: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
+    infrastructure_available: Annotated[Optional[Dict[str, bool]], merge_dicts]  # Merge dicts
     
     # Error handling
     errors: Annotated[List[str], operator.add]  # Accumulate errors
