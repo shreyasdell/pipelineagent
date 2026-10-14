@@ -54,6 +54,8 @@ class GitHubClient:
                 response = requests.post(url, headers=self.headers, json=data)
             elif method == "PUT":
                 response = requests.put(url, headers=self.headers, json=data)
+            elif method == "PATCH":
+                response = requests.patch(url, headers=self.headers, json=data)
             elif method == "DELETE":
                 response = requests.delete(url, headers=self.headers)
             else:

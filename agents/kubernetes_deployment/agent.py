@@ -84,6 +84,12 @@ IMPORTANT: You must respond with a valid JSON object in the following format:
             for path in kubeconfig_paths:
                 if path and os.path.exists(path):
                     config.load_kube_config(config_file=path)
+                    # Disable SSL verification for self-signed certificates
+                    client.Configuration._default.verify_ssl = False
+                    client.Configuration._default.debug = False
+                    # Suppress urllib3 warnings
+                    import urllib3
+                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
                     logger.info(f"Loaded kubeconfig from {path}")
                     kubeconfig_loaded = True
                     break
@@ -442,30 +448,45 @@ Constraint Resolver Report: {state.get('constraint_resolver_report', 'Not availa
             state["gitops_commit_sha"] = gitops_result.get("commit_sha")
             state["gitops_branch"] = gitops_result.get("branch")
             state["gitops_repository"] = gitops_result.get("repository")
-            
-            # Step 5: Create ArgoCD application
-            logger.info("Creating ArgoCD application...")
-            argocd_result = await self._create_argocd_application(kubernetes_manifests, state)
-            state["argocd_application"] = argocd_result
-            
-            # Step 6: Trigger ArgoCD sync
-            logger.info("Triggering ArgoCD sync...")
-            sync_result = await self._sync_argocd_application(state)
-            state["argocd_sync_status"] = sync_result.get("status")
-            
-            # Step 7: Verify deployment status
-            logger.info("Verifying deployment status...")
-            deployment_verification = await self._verify_argocd_deployment(state)
-            state["argocd_status"] = deployment_verification
-            
+
+            # Only proceed with ArgoCD if commit succeeded
+            argocd_result = None
+            sync_result = None
+            deployment_verification = None
+
+            if gitops_result.get("status") == "success":
+                # Step 5: Create ArgoCD application
+                logger.info("Creating ArgoCD application...")
+                argocd_result = await self._create_argocd_application(kubernetes_manifests, state)
+                state["argocd_application"] = argocd_result
+
+                # Only proceed with sync if ArgoCD app creation succeeded
+                if argocd_result.get("status") == "success":
+                    # Step 6: Trigger ArgoCD sync
+                    logger.info("Triggering ArgoCD sync...")
+                    sync_result = await self._sync_argocd_application(state)
+                    state["argocd_sync_status"] = sync_result.get("status")
+
+                    # Step 7: Verify deployment status
+                    logger.info("Verifying deployment status...")
+                    deployment_verification = await self._verify_argocd_deployment(state)
+                    state["argocd_status"] = deployment_verification
+                else:
+                    logger.warning(f"Skipping ArgoCD sync: application creation failed - {argocd_result.get('reason', 'Unknown')}")
+                    state["argocd_status"] = {"overall_status": "failed", "reason": "ArgoCD application creation failed"}
+            else:
+                logger.warning(f"Skipping ArgoCD application creation: manifests not committed to repository - {gitops_result.get('reason', 'Unknown')}")
+                state["argocd_status"] = {"overall_status": "failed", "reason": "Manifests not committed to repository"}
+
             # Step 8: Compile final Kubernetes deployment report
             logger.info("Compiling final Kubernetes deployment report...")
             k8s_report = await self._compile_kubernetes_report(state, k8s_design, kubernetes_manifests, gitops_result, argocd_result, sync_result, deployment_verification)
             state["kubernetes_deployment_report"] = k8s_report
             
             # Add message to conversation
+            deployment_status = deployment_verification.get('overall_status', 'unknown') if deployment_verification else 'skipped'
             state["messages"].append(AIMessage(
-                content=f"Kubernetes deployment created successfully. Deployment status: {deployment_verification.get('overall_status', 'unknown')}"
+                content=f"Kubernetes deployment created successfully. Deployment status: {deployment_status}"
             ))
             
             # Save updated state

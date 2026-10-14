@@ -389,18 +389,22 @@ def should_retry_deployment(state: AgentState) -> Literal["healthy", "unhealthy"
     Conditional edge: Check if deployment should be retried
     """
     health_status = state.get("health_status", {})
-    
+
     if health_status.get("healthy", False):
         return "healthy"
-    
+
     # Check retry count
-    if state.get("retry_count", 0) < state.get("max_retries", 3):
-        state["retry_count"] += 1
-        logger.info(f"Retrying deployment (attempt {state['retry_count']})")
+    current_retry = state.get("retry_count", 0)
+    max_retries = state.get("max_retries", 3)
+
+    if current_retry < max_retries:
+        state["retry_count"] = current_retry + 1
+        logger.info(f"Retrying deployment (attempt {state['retry_count']}/{max_retries})")
         return "unhealthy"
-    
-    logger.error("Max retries exceeded, marking as failed")
-    return "unhealthy"
+
+    logger.error(f"Max retries exceeded ({max_retries}), marking as failed")
+    state["current_state"] = "FAILED"
+    return "healthy"  # Return healthy to go to END (no more retries)
 
 
 def should_continue_argocd_sync(state: AgentState) -> Literal["synced", "failed", "skipped"]:

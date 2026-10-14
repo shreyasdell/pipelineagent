@@ -70,8 +70,8 @@ class AgentState(TypedDict):
     # Error handling
     errors: Annotated[List[str], operator.add]  # Accumulate errors
     current_agent: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
-    retry_count: Annotated[int, lambda a, b: max(a, b)]  # Take max value
-    max_retries: Annotated[int, lambda a, b: max(a, b)]  # Take max value
+    retry_count: Annotated[int, lambda a, b: b]  # Last writer wins (not max)
+    max_retries: Annotated[int, lambda a, b: b]  # Last writer wins (not max)
 
 
 class ConstraintResolverReport(TypedDict):
