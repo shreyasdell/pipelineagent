@@ -195,7 +195,7 @@ class GitHubManifestManager:
             logger.info(f"Updating branch {target_branch} to new commit...")
             self.github_client.repo = repo
             update_result = self.github_client.update_reference(
-                f"refs/heads/{target_branch}",
+                f"heads/{target_branch}",  # Don't include refs/ prefix
                 sha=commit_sha
             )
             

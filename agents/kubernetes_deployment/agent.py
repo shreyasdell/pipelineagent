@@ -1619,15 +1619,15 @@ spec:
                 "service": kubernetes_manifests.get('service', ''),
                 "argocd_application": kubernetes_manifests.get('argocd_application', '')
             },
-            "gitops_commit": gitops_result,
-            "argocd_application": argocd_result,
-            "argocd_sync": sync_result,
-            "deployment_verification": deployment_verification,
+            "gitops_commit": gitops_result or {},
+            "argocd_application": argocd_result or {},
+            "argocd_sync": sync_result or {},
+            "deployment_verification": deployment_verification or {},
             "infrastructure_details": state.get('infrastructure_details', {}),
-            "deployment_status": self._determine_deployment_status(deployment_verification),
+            "deployment_status": self._determine_deployment_status(deployment_verification or {}),
             "service_endpoint": f"http://{safe_model_id}.model-serving.svc.cluster.local/v1/models",
-            "next_steps": self._generate_deployment_next_steps(deployment_verification),
-            "summary": self._generate_deployment_summary(model_id, deployment_verification)
+            "next_steps": self._generate_deployment_next_steps(deployment_verification or {}),
+            "summary": self._generate_deployment_summary(model_id, deployment_verification or {})
         }
         
         return k8s_report
