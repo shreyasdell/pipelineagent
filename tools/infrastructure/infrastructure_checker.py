@@ -53,8 +53,9 @@ class InfrastructureChecker:
         try:
             # Set KUBECONFIG to use correct config (prioritize workspace config)
             kubeconfig_paths = [
-                "/workspaces/AgenticPipeline/.kube/config",  # Workspace config first (has correct IP)
-                "/mnt/c/Users/Shreyas_DK/.kube/config",  # WSL to Windows path
+                "/workspaces/AgenticPipeline/.kube/config",  # Workspace config (has correct IP)
+                "/mnt/c/Users/Shreyas_DK/Projects/AgenticPipeline/.kube/config",  # WSL project path
+                "/mnt/c/Users/Shreyas_DK/.kube/config",  # WSL home path
                 os.environ.get('KUBECONFIG'),  # Environment variable
                 os.path.expanduser("~/.kube/config"),  # Standard Linux path
             ]
@@ -120,8 +121,9 @@ class InfrastructureChecker:
         try:
             # Set KUBECONFIG to use correct config (prioritize workspace config)
             kubeconfig_paths = [
-                "/workspaces/AgenticPipeline/.kube/config",  # Workspace config first (has correct IP)
-                "/mnt/c/Users/Shreyas_DK/.kube/config",  # WSL to Windows path
+                "/workspaces/AgenticPipeline/.kube/config",  # Workspace config (has correct IP)
+                "/mnt/c/Users/Shreyas_DK/Projects/AgenticPipeline/.kube/config",  # WSL project path
+                "/mnt/c/Users/Shreyas_DK/.kube/config",  # WSL home path
                 os.environ.get('KUBECONFIG'),  # Environment variable
                 os.path.expanduser("~/.kube/config"),  # Standard Linux path
             ]

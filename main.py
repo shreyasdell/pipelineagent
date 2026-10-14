@@ -162,6 +162,13 @@ async def run_deployment(
 async def main():
     """Main entry point"""
     setup_logging()
+
+    # Set KUBECONFIG to use correct config for infrastructure check
+    import os
+    workspace_config = "/workspaces/AgenticPipeline/.kube/config"
+    if os.path.exists(workspace_config):
+        os.environ['KUBECONFIG'] = workspace_config
+        print(f"Set KUBECONFIG to: {workspace_config}")
     
     logger.info("🚀 Agentic Pipeline - Model Deployment System")
     logger.info("Phase 1: Hugging Face + SGLang + MicroK8s + ArgoCD")
