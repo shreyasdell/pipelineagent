@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sglang-deployment
-  namespace: sglang-deploy
+  name: sglang-vllm-deployment
+  namespace: sglang-deploy-namespace
   labels:
-    app: sglang-deployment
+    app: sglang-vllm-deployment
     model: microsoft/Phi-3-mini-4k-instruct
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sglang-deployment
+      app: sglang-vllm-deployment
   template:
     metadata:
       labels:
-        app: sglang-deployment
+        app: sglang-vllm-deployment
         model: microsoft/Phi-3-mini-4k-instruct
     spec:
       runtimeClassName: nvidia
@@ -31,22 +31,22 @@ spec:
         - name: MODEL_ID
           valueFrom:
             configMapKeyRef:
-              name: sglang-deployment-config
+              name: sglang-vllm-deployment-config
               key: MODEL_ID
         - name: MODEL_PATH
           valueFrom:
             configMapKeyRef:
-              name: sglang-deployment-config
+              name: sglang-vllm-deployment-config
               key: MODEL_PATH
         - name: PORT
           valueFrom:
             configMapKeyRef:
-              name: sglang-deployment-config
+              name: sglang-vllm-deployment-config
               key: PORT
         - name: HOST
           valueFrom:
             configMapKeyRef:
-              name: sglang-deployment-config
+              name: sglang-vllm-deployment-config
               key: HOST
         - name: NVIDIA_VISIBLE_DEVICES
           value: "all"
@@ -77,4 +77,4 @@ spec:
       volumes:
       - name: model-storage
         persistentVolumeClaim:
-          claimName: sglang-deployment-models-pvc
+          claimName: sglang-vllm-deployment-models-pvc
