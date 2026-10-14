@@ -165,10 +165,18 @@ async def main():
 
     # Set KUBECONFIG to use correct config for infrastructure check
     import os
-    workspace_config = "/workspaces/AgenticPipeline/.kube/config"
-    if os.path.exists(workspace_config):
-        os.environ['KUBECONFIG'] = workspace_config
-        print(f"Set KUBECONFIG to: {workspace_config}")
+    # Try multiple paths in order (WSL first, then workspace)
+    kubeconfig_paths = [
+        "/mnt/c/Users/Shreyas_DK/Projects/AgenticPipeline/.kube/config",  # WSL project path
+        "/workspaces/AgenticPipeline/.kube/config",  # Workspace path
+        os.path.expanduser("~/.kube/config"),  # Home directory
+    ]
+
+    for path in kubeconfig_paths:
+        if os.path.exists(path):
+            os.environ['KUBECONFIG'] = path
+            print(f"Set KUBECONFIG to: {path}")
+            break
     
     logger.info("🚀 Agentic Pipeline - Model Deployment System")
     logger.info("Phase 1: Hugging Face + SGLang + MicroK8s + ArgoCD")
