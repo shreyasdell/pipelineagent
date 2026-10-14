@@ -164,7 +164,7 @@ async def main():
     setup_logging()
     
     logger.info("🚀 Agentic Pipeline - Model Deployment System")
-    logger.info("Phase 1: Hugging Face + vLLM + MicroK8s + ArgoCD")
+    logger.info("Phase 1: Hugging Face + SGLang + MicroK8s + ArgoCD")
     logger.info("")
     
     # Check infrastructure
@@ -172,11 +172,21 @@ async def main():
     
     # Determine if we should proceed
     recommended_type = infrastructure_results.get("recommended_deployment_type")
-    
+
+    # For Kubernetes deployment, we only need microk8s, kubectl, and gpu
+    # SGLang will be installed in the container
     if recommended_type == "insufficient_infrastructure":
-        logger.error("❌ Insufficient infrastructure for deployment")
-        logger.error("Please install required components before proceeding")
-        sys.exit(1)
+        # Check if we have the minimum for Kubernetes deployment
+        if (infrastructure_results.get("microk8s", {}).get("available", False) and
+            infrastructure_results.get("kubectl", {}).get("available", False) and
+            infrastructure_results.get("gpu", {}).get("available", False)):
+            logger.warning("⚠️ Some optional components missing, but proceeding with Kubernetes deployment")
+            recommended_type = "kubernetes"
+        else:
+            logger.error("❌ Insufficient infrastructure for deployment")
+            logger.error("Please install required components before proceeding")
+            logger.error("Required: MicroK8s, kubectl, GPU")
+            sys.exit(1)
     
     logger.info(f"\n✅ Infrastructure check passed. Recommended deployment type: {recommended_type}")
     

@@ -51,12 +51,12 @@ class InfrastructureChecker:
     def _check_microk8s(self) -> Dict[str, Any]:
         """Check MicroK8s availability and status"""
         try:
-            # Set KUBECONFIG to use correct config
+            # Set KUBECONFIG to use correct config (prioritize workspace config)
             kubeconfig_paths = [
-                os.environ.get('KUBECONFIG'),
-                os.path.expanduser("~/.kube/config"),
-                "/workspaces/AgenticPipeline/.kube/config",
-                "/mnt/c/Users/Shreyas_DK/.kube/config",
+                "/workspaces/AgenticPipeline/.kube/config",  # Workspace config first (has correct IP)
+                "/mnt/c/Users/Shreyas_DK/.kube/config",  # WSL to Windows path
+                os.environ.get('KUBECONFIG'),  # Environment variable
+                os.path.expanduser("~/.kube/config"),  # Standard Linux path
             ]
 
             env = os.environ.copy()
@@ -118,12 +118,12 @@ class InfrastructureChecker:
     def _check_kubectl(self) -> Dict[str, Any]:
         """Check kubectl availability and version"""
         try:
-            # Set KUBECONFIG to use correct config
+            # Set KUBECONFIG to use correct config (prioritize workspace config)
             kubeconfig_paths = [
-                os.environ.get('KUBECONFIG'),
-                os.path.expanduser("~/.kube/config"),
-                "/workspaces/AgenticPipeline/.kube/config",
-                "/mnt/c/Users/Shreyas_DK/.kube/config",
+                "/workspaces/AgenticPipeline/.kube/config",  # Workspace config first (has correct IP)
+                "/mnt/c/Users/Shreyas_DK/.kube/config",  # WSL to Windows path
+                os.environ.get('KUBECONFIG'),  # Environment variable
+                os.path.expanduser("~/.kube/config"),  # Standard Linux path
             ]
 
             env = os.environ.copy()
