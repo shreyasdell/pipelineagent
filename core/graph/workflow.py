@@ -360,7 +360,7 @@ async def perform_health_check(state: AgentState) -> Dict[str, Any]:
     # 2. ArgoCD either succeeded or was skipped (not failed)
     
     git_commit_success = bool(gitops_result)
-    argocd_success = argocd_status.get("overall_status") != "failed"
+    argocd_success = argocd_status.get("overall_status") != "failed" if isinstance(argocd_status, dict) else True
     
     if git_commit_success and argocd_success:
         # Sanitize model ID for service endpoint
