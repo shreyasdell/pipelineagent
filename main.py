@@ -205,10 +205,42 @@ async def main():
     
     logger.info(f"\n✅ Infrastructure check passed. Recommended deployment type: {recommended_type}")
     
-    # Example deployment configuration
-    model_id = "microsoft/Phi-3-mini-4k-instruct"  # HuggingFace model
-    latency_requirement = "<100ms"
-    deployment_type = "standard"
+    # Interactive prompt for model selection
+    print("\n" + "=" * 60)
+    print("Model Deployment Configuration")
+    print("=" * 60)
+    print("\nPlease enter the Hugging Face model you want to deploy:")
+    print("Example: microsoft/Phi-3-mini-4k-instruct")
+    print("         meta-llama/Llama-3.2-3B-Instruct")
+    print("         Qwen/Qwen2.5-7B-Instruct")
+    print()
+    
+    model_id = input("Model ID (e.g., microsoft/Phi-3-mini-4k-instruct): ").strip()
+    
+    if not model_id:
+        logger.error("❌ Model ID is required")
+        sys.exit(1)
+    
+    print(f"\nSelected model: {model_id}")
+    
+    # Optional: Ask for latency requirement
+    latency_input = input("Latency requirement (e.g., <100ms, press Enter for default): ").strip()
+    latency_requirement = latency_input if latency_input else "<100ms"
+    
+    # Optional: Ask for deployment type
+    print("\nDeployment type options:")
+    print("  1. standard")
+    print("  2. canary")
+    print("  3. blue-green")
+    deployment_input = input("Deployment type (press Enter for 'standard'): ").strip()
+    deployment_type = deployment_input if deployment_input else "standard"
+    
+    print("\n" + "=" * 60)
+    print(f"Configuration Summary:")
+    print(f"  Model: {model_id}")
+    print(f"  Latency: {latency_requirement}")
+    print(f"  Deployment Type: {deployment_type}")
+    print("=" * 60 + "\n")
     
     infrastructure_details = {
         "gpu_type": "NVIDIA RTX PRO 2000",
