@@ -5,7 +5,7 @@ metadata:
   namespace: sglang-deploy
   labels:
     app: sglang-deployment
-    model: google/embeddinggemma-2
+    model: google-embeddinggemma-2
 spec:
   replicas: 1
   selector:
@@ -15,7 +15,7 @@ spec:
     metadata:
       labels:
         app: sglang-deployment
-        model: google/embeddinggemma-2
+        model: google-embeddinggemma-2
     spec:
       runtimeClassName: nvidia
       containers:
@@ -78,3 +78,4 @@ spec:
       - name: model-storage
         persistentVolumeClaim:
           claimName: sglang-deployment-models-pvc
+
