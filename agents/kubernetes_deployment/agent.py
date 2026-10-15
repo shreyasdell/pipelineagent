@@ -800,7 +800,17 @@ Consider the model characteristics, infrastructure constraints, and serving requ
             Dictionary of Kubernetes manifests
         """
         model_id = state['model_id']
-        safe_model_id = model_id.replace('_', '-').replace('/', '-').replace(':', '-')
+        
+        # Sanitize model ID for Kubernetes labels (RFC 1123 compliant)
+        def sanitize_k8s_label(value: str) -> str:
+            import re
+            sanitized = value.lower()
+            sanitized = sanitized.replace("/", "-")
+            sanitized = re.sub(r'[^a-z0-9._-]', '-', sanitized)
+            sanitized = sanitized.strip('-_.')
+            return sanitized[:63]  # K8s labels max 63 chars
+        
+        safe_model_id = sanitize_k8s_label(model_id)
         k8s_config = k8s_design.get("kubernetes_configuration", {})
         resource_reqs = k8s_config.get("resource_requirements", {})
         gpu_reqs = k8s_config.get("gpu_requirements", {})
@@ -852,7 +862,7 @@ metadata:
   namespace: {namespace}
   labels:
     app: {deployment_name}
-    model: {model_id}
+    model: {safe_model_id}
 spec:
   replicas: {replicas}
   selector:
@@ -862,7 +872,7 @@ spec:
     metadata:
       labels:
         app: {deployment_name}
-        model: {model_id}
+        model: {safe_model_id}
     spec:
       runtimeClassName: nvidia
       containers:
@@ -1030,7 +1040,7 @@ metadata:
   namespace: {namespace}
   labels:
     app: {deployment_name}
-    model: {model_id}
+    model: {safe_model_id}
 spec:
   replicas: {replicas}
   selector:
@@ -1040,7 +1050,7 @@ spec:
     metadata:
       labels:
         app: {deployment_name}
-        model: {model_id}
+        model: {safe_model_id}
     spec:
       containers:
       - name: vllm-server
@@ -1132,7 +1142,7 @@ metadata:
   namespace: {namespace}
   labels:
     app: {deployment_name}
-    model: {model_id}
+    model: {safe_model_id}
 spec:
   type: {settings.default_service_type}
   ports:
@@ -1150,7 +1160,7 @@ metadata:
   namespace: {namespace}
   labels:
     app: {deployment_name}
-    model: {model_id}
+    model: {safe_model_id}
 spec:
   project: default
   source:
