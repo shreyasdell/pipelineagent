@@ -67,6 +67,9 @@ class AgentState(TypedDict):
     deployment_type_decision: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins
     infrastructure_available: Annotated[Optional[Dict[str, bool]], merge_dicts]  # Merge dicts
 
+    # Health check status
+    health_status: Annotated[Optional[Dict[str, Any]], merge_dicts]  # Merge dicts
+
     # Error handling
     errors: Annotated[List[str], operator.add]  # Accumulate errors
     current_agent: Annotated[Optional[str], lambda a, b: b or a]  # Last writer wins

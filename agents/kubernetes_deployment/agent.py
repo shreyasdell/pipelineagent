@@ -1243,7 +1243,7 @@ spec:
             app_result = self.argocd_client.create_application(
                 app_name=safe_model_id,
                 repo_url=repo,
-                path=f"deployment/manifests/{safe_model_id}",
+                path=".",  # Use repo root since manifests are committed to root
                 destination_server="https://kubernetes.default.svc",
                 destination_namespace=namespace,
                 project="default"

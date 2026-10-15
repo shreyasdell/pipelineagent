@@ -84,7 +84,7 @@ def create_deployment_graph():
         should_continue_argocd_sync,
         {
             "synced": "health_check",
-            "failed": "kubernetes_deployment",  # Retry deployment
+            "failed": "health_check",  # Continue to health check even if ArgoCD fails
             "skipped": "health_check"  # Continue without ArgoCD
         }
     )
@@ -322,6 +322,7 @@ async def health_check_node(state: AgentState) -> AgentState:
     
     # Perform health check
     health_status = await perform_health_check(state)
+    state["health_status"] = health_status  # Set health_status for should_retry_deployment
     
     if health_status["healthy"]:
         state["current_state"] = "DEPLOYED"
@@ -350,24 +351,28 @@ async def perform_health_check(state: AgentState) -> Dict[str, Any]:
     """
     Perform health check on the deployed service
     """
-    # This would typically check the vLLM endpoint
-    # For now, we'll simulate the check
+    # Check if git commit succeeded
+    gitops_result = state.get("gitops_commit_sha")
+    argocd_status = state.get("argocd_status", {})
     
-    endpoint = state.get("service_endpoint", "http://localhost:8000/v1/models")
+    # Health check passes if:
+    # 1. Git commit succeeded (has commit SHA)
+    # 2. ArgoCD either succeeded or was skipped (not failed)
     
-    try:
-        # In real implementation, this would make an HTTP request
-        # For now, we'll return a simulated healthy status
+    git_commit_success = bool(gitops_result)
+    argocd_success = argocd_status.get("overall_status") != "failed"
+    
+    if git_commit_success and argocd_success:
         return {
             "healthy": True,
-            "endpoint": endpoint,
-            "reason": "Health check passed"
+            "endpoint": f"http://{state.get('model_id', 'model').replace('/', '-').replace('_', '-')}.model-serving.svc.cluster.local/v1/models",
+            "reason": "Git commit succeeded and ArgoCD status is not failed"
         }
-    except Exception as e:
+    else:
         return {
             "healthy": False,
-            "endpoint": endpoint,
-            "reason": f"Health check failed: {str(e)}"
+            "endpoint": None,
+            "reason": f"Git commit: {git_commit_success}, ArgoCD success: {argocd_success}"
         }
 
 
