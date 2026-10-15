@@ -363,9 +363,14 @@ async def perform_health_check(state: AgentState) -> Dict[str, Any]:
     argocd_success = argocd_status.get("overall_status") != "failed"
     
     if git_commit_success and argocd_success:
+        # Sanitize model ID for service endpoint
+        model_id = state.get('model_id', 'model')
+        safe_model_id = model_id.lower().replace('_', '-').replace('/', '-').replace('.', '-')
+        safe_model_id = ''.join(c for c in safe_model_id if c.isalnum() or c == '-')
+        safe_model_id = safe_model_id.strip('-')
         return {
             "healthy": True,
-            "endpoint": f"http://{state.get('model_id', 'model').replace('/', '-').replace('_', '-')}.model-serving.svc.cluster.local/v1/models",
+            "endpoint": f"http://{safe_model_id}.model-serving.svc.cluster.local/v1/models",
             "reason": "Git commit succeeded and ArgoCD status is not failed"
         }
     else:

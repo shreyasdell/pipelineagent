@@ -1222,7 +1222,14 @@ spec:
             ArgoCD application creation result
         """
         model_id = state['model_id']
-        safe_model_id = model_id.replace('_', '-').replace('/', '')
+        # Sanitize for ArgoCD: lowercase, replace special chars with hyphens
+        safe_model_id = model_id.lower().replace('_', '-').replace('/', '-').replace('.', '-')
+        # Remove any remaining invalid characters (keep only alphanumeric and hyphens)
+        safe_model_id = ''.join(c for c in safe_model_id if c.isalnum() or c == '-')
+        # Ensure it doesn't start or end with hyphen
+        safe_model_id = safe_model_id.strip('-')
+        # Limit length (Kubernetes names max 253 chars)
+        safe_model_id = safe_model_id[:253]
         namespace = settings.default_namespace
         
         try:
