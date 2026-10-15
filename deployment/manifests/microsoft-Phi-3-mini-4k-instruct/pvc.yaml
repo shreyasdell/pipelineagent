@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: sglang-deployment-models-pvc
-  namespace: sglang-namespace
+  namespace: sglang-deploy-namespace
 spec:
   accessModes:
     - ReadWriteOnce

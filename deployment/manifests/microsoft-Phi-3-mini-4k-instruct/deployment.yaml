@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: sglang-deployment
-  namespace: sglang-namespace
+  namespace: sglang-deploy-namespace
   labels:
     app: sglang-deployment
     model: microsoft/Phi-3-mini-4k-instruct
