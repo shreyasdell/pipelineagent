@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sglang-deployment-config
+  namespace: sglang-deploy
+data:
+  MODEL_ID: "google/embeddinggemma-2"
+  MODEL_PATH: "/models/phi3-mini"
+  PORT: "8000"
+  HOST: "0.0.0.0"
