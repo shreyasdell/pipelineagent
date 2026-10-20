@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: embeddinggemma
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shreyasdell/pipelineagent.git
+    targetRevision: main
+    path: deployment/helm
+    helm:
+      valueFiles:
+        - values/embeddinggemma.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sglang-deploy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

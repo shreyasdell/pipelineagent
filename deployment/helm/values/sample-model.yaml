@@ -1,0 +1,70 @@
+# Sample values file for a new model
+# Copy this file and customize it for your model
+
+model:
+  id: "your-org/your-model-name"  # HuggingFace model ID
+  name: "your-model-name"         # Kubernetes resource name (lowercase, hyphens only)
+  storagePath: "/models/your-model"  # Path where model is stored in PVC
+
+deployment:
+  name: "your-model-name"         # Deployment name
+  replicas: 1
+  runtimeClass: nvidia
+
+container:
+  image: lmsysorg/sglang:latest
+  command: ["python", "-m", "sglang.launch_server"]
+  args:
+    - "--model-path"
+    - "$(MODEL_PATH)"
+    - "--port"
+    - "$(PORT)"
+    - "--host"
+    - "$(HOST)"
+  port: 8000
+
+resources:
+  requests:
+    cpu: 4
+    memory: 16Gi
+    nvidiaGpu: 1
+  limits:
+    nvidiaGpu: 1
+
+service:
+  name: "your-model-name-service"
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+pvc:
+  name: "your-model-name-models-pvc"
+  size: 50Gi
+  accessModes:
+    - ReadWriteOnce
+
+configMap:
+  name: "your-model-name-config"
+  data:
+    MODEL_ID: "your-org/your-model-name"
+    MODEL_PATH: "/models/your-model"
+    PORT: "8000"
+    HOST: "0.0.0.0"
+
+namespace:
+  name: "model-serving"  # Namespace name
+  create: true
+
+healthCheck:
+  livenessProbe:
+    path: /health
+    initialDelaySeconds: 60
+    periodSeconds: 30
+  readinessProbe:
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+env:
+  - name: NVIDIA_VISIBLE_DEVICES
+    value: "all"

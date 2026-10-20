@@ -1,0 +1,81 @@
+# Default values for sglang-model-serving
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Model configuration
+model:
+  id: "microsoft/Phi-3-mini-4k-instruct"  # HuggingFace model ID
+  name: "phi-3-mini-4k-instruct"         # Kubernetes resource name
+  storagePath: "/models/phi3-mini"       # Path where model is stored in PVC
+
+# Deployment configuration
+deployment:
+  name: "phi-3-mini-4k-instruct"
+  replicas: 1
+  runtimeClass: nvidia
+
+# Container configuration
+container:
+  image: lmsysorg/sglang:latest
+  command: ["python", "-m", "sglang.launch_server"]
+  args:
+    - "--model-path"
+    - "$(MODEL_PATH)"
+    - "--port"
+    - "$(PORT)"
+    - "--host"
+    - "$(HOST)"
+  port: 8000
+
+# Resource requests and limits
+resources:
+  requests:
+    cpu: 4
+    memory: 16Gi
+    nvidiaGpu: 1
+  limits:
+    nvidiaGpu: 1
+
+# Service configuration
+service:
+  name: "phi-3-mini-4k-instruct-service"
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+# PVC configuration
+pvc:
+  name: "phi-3-mini-4k-instruct-models-pvc"
+  size: 50Gi
+  accessModes:
+    - ReadWriteOnce
+
+# ConfigMap configuration
+configMap:
+  name: "phi-3-mini-4k-instruct-config"
+  data:
+    MODEL_ID: "microsoft/Phi-3-mini-4k-instruct"
+    MODEL_PATH: "/models/phi3-mini"
+    PORT: "8000"
+    HOST: "0.0.0.0"
+
+# Namespace configuration
+namespace:
+  name: "sglang-serving"
+  create: true
+
+# Health check configuration
+healthCheck:
+  livenessProbe:
+    path: /health
+    initialDelaySeconds: 60
+    periodSeconds: 30
+  readinessProbe:
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# Environment variables (additional to ConfigMap)
+env:
+  - name: NVIDIA_VISIBLE_DEVICES
+    value: "all"
