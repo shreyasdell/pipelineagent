@@ -4,10 +4,10 @@
 model:
   id: "facebook/sam3"
   name: "facebook-sam3"
-  storagePath: "/models/facebook/sam3"
+  storagePath: "/models/facebook/sam3.safetensors"
 
 deployment:
-  name: "sglang-deployment"
+  name: "sglang-deployment-2026-10-21"
   replicas: 1
   runtimeClass: nvidia
 
@@ -26,34 +26,34 @@ container:
 resources:
   requests:
     cpu: 2
-    memory: 8Gi
+    memory: 6Gi
     nvidiaGpu: 1
   limits:
     nvidiaGpu: 1
 
 service:
-  name: "sglang-service"
+  name: "sglang-deployment-service"
   type: NodePort
   port: 8000
   targetPort: 8000
   nodePort: 30080
 
 pvc:
-  name: "sglang-deployment-models-pvc"
+  name: "sglang-deployment-2026-10-21-models-pvc"
   size: 50Gi
   accessModes:
     - ReadWriteOnce
 
 configMap:
-  name: "sglang-deployment-config"
+  name: "sglang-deployment-2026-10-21-config"
   data:
     MODEL_ID: "facebook/sam3"
-    MODEL_PATH: "/models/facebook/sam3"
+    MODEL_PATH: "/models/facebook/sam3.safetensors"
     PORT: "8000"
     HOST: "0.0.0.0"
 
 namespace:
-  name: "sglang"
+  name: "sglang-deployment"
   create: true
 
 healthCheck:
