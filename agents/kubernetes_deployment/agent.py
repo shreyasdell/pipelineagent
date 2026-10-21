@@ -28,6 +28,7 @@ class KubernetesDeploymentAgent:
         self.huggingface_client = HuggingFaceClient()
         self.github_manifest_manager = GitHubManifestManager()
         self._init_kubernetes_client()
+        self.gpu_available = True  # Default to True, will be checked
         self.system_prompt = """You are a Kubernetes Deployment Agent for AI model deployment.
 Your task is to handle Kubernetes deployment for SGLang serving on MicroK8s using Helm charts.
 
@@ -509,7 +510,7 @@ Constraint Resolver Report: {state.get('constraint_resolver_report', 'Not availa
     async def _check_infrastructure_prerequisites(self) -> Dict[str, bool]:
         """
         Check infrastructure prerequisites for Kubernetes deployment
-        
+
         Returns:
             Dictionary of infrastructure availability status
         """
@@ -520,12 +521,16 @@ Constraint Resolver Report: {state.get('constraint_resolver_report', 'Not availa
             "argocd": False,
             "huggingface": False
         }
-        
+
         # Use API-based checks instead of subprocess
         infrastructure_status["kubectl"] = self._check_kubectl_cli().get("available", False)
         infrastructure_status["microk8s"] = self._check_kubernetes_api().get("available", False)
-        infrastructure_status["gpu"] = self._check_gpu_host().get("available", False)
-        
+
+        # Check GPU availability via Kubernetes API
+        gpu_available = self._check_gpu_available()
+        infrastructure_status["gpu"] = gpu_available
+        self.gpu_available = gpu_available  # Store for later use
+
         try:
             # Check ArgoCD
             if settings.argocd_url:
@@ -535,7 +540,7 @@ Constraint Resolver Report: {state.get('constraint_resolver_report', 'Not availa
                 logger.warning("ArgoCD not configured")
         except:
             logger.warning("ArgoCD not available")
-        
+
         try:
             # Check Hugging Face connectivity (skip for local Ollama models)
             model_id = state.get('model_id', '')
@@ -548,8 +553,24 @@ Constraint Resolver Report: {state.get('constraint_resolver_report', 'Not availa
                 logger.info("Hugging Face accessible")
         except:
             logger.warning("Hugging Face not accessible")
-        
+
         return infrastructure_status
+
+    def _check_gpu_available(self) -> bool:
+        """Check if GPU is available in Kubernetes nodes"""
+        try:
+            v1 = client.CoreV1Api()
+            nodes = v1.list_node()
+            for node in nodes.items:
+                gpu_count = node.status.allocatable.get("nvidia.com/gpu", "0")
+                if int(gpu_count) > 0:
+                    logger.info(f"GPU available: {gpu_count} on node {node.metadata.name}")
+                    return True
+            logger.warning("No GPU registered on any node")
+            return False
+        except Exception as e:
+            logger.warning(f"Could not check GPU availability: {e}")
+            return False
     
     async def _design_kubernetes_deployment(self, state: AgentState) -> Dict[str, Any]:
         """
@@ -594,6 +615,17 @@ Kubernetes Deployment Requirements:
             prompt += f"""
 Node capacity constraints (DO NOT exceed these):
 {node_info}
+"""
+
+        # Add GPU availability
+        gpu_available = getattr(self, 'gpu_available', True)
+        if not gpu_available:
+            prompt += """
+IMPORTANT: GPU is NOT available in the cluster.
+- DO NOT request nvidia.com/gpu in the deployment
+- Generate a CPU-only deployment as fallback
+- Remove runtimeClassName: nvidia from the deployment spec
+- Set GPU requirements to disabled
 """
 
         # Add constraint resolver report if available
