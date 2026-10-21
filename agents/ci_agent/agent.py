@@ -526,6 +526,9 @@ Consider the model characteristics and infrastructure constraints when designing
             repo_name = settings.github_repo
             logger.info(f"Using repository: {repo_name}")
 
+            # Get model name from state
+            model_name = state.get('model_id', 'unknown-model')
+
             # Create a feature branch for CI pipeline changes
             # Sanitize model ID for branch name (remove special characters)
             safe_model_id = sanitize_model_name(state['model_id'])

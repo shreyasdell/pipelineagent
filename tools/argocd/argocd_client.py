@@ -93,26 +93,30 @@ class ArgoCDClient:
     def get_application(self, app_name: str) -> Dict[str, Any]:
         """
         Get application details from ArgoCD
-        
+
         Args:
             app_name: Name of the application
-            
+
         Returns:
             Application details
         """
+        # Lowercase app name to avoid case mismatch issues
+        app_name = app_name.lower().replace("/", "-")
         endpoint = f"/applications/{app_name}"
         return self._make_request("GET", endpoint)
     
     def get_application_status(self, app_name: str) -> Dict[str, Any]:
         """
         Get application status including sync and health status
-        
+
         Args:
             app_name: Name of the application
-            
+
         Returns:
             Application status information
         """
+        # Lowercase app name to avoid case mismatch issues
+        app_name = app_name.lower().replace("/", "-")
         try:
             app = self.get_application(app_name)
             
@@ -143,15 +147,17 @@ class ArgoCDClient:
     def sync_application(self, app_name: str, revision: Optional[str] = None, dry_run: bool = False) -> Dict[str, Any]:
         """
         Trigger application synchronization
-        
+
         Args:
             app_name: Name of the application
             revision: Git revision to sync (optional)
             dry_run: Perform dry run without actual sync
-            
+
         Returns:
             Sync operation response
         """
+        # Lowercase app name to avoid case mismatch issues
+        app_name = app_name.lower().replace("/", "-")
         endpoint = f"/applications/{app_name}/sync"
         
         data = {
