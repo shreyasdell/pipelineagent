@@ -33,40 +33,41 @@ class GitHubClient:
         if not self.repo:
             logger.warning("GitHub repository not configured - repository operations will be limited")
     
-    def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
+    def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, json: Optional[Dict] = None) -> Dict[str, Any]:
         """
         Make authenticated request to GitHub API
-        
+
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
             endpoint: API endpoint path
-            data: Request body data
-            
+            data: Request body data (for params)
+            json: Request body data (for json payload)
+
         Returns:
             Response JSON data
         """
         url = f"{self.base_url}{endpoint}"
-        
+
         try:
             if method == "GET":
                 response = requests.get(url, headers=self.headers, params=data)
             elif method == "POST":
-                response = requests.post(url, headers=self.headers, json=data)
+                response = requests.post(url, headers=self.headers, json=json or data)
             elif method == "PUT":
-                response = requests.put(url, headers=self.headers, json=data)
+                response = requests.put(url, headers=self.headers, json=json or data)
             elif method == "PATCH":
-                response = requests.patch(url, headers=self.headers, json=data)
+                response = requests.patch(url, headers=self.headers, json=json or data)
             elif method == "DELETE":
                 response = requests.delete(url, headers=self.headers)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
-            
+
             response.raise_for_status()
-            
+
             if response.content:
                 return response.json()
             return {}
-            
+
         except requests.exceptions.RequestException as e:
             logger.error(f"GitHub API request failed: {e}")
             if hasattr(e.response, 'status_code'):

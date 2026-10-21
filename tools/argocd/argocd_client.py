@@ -100,8 +100,8 @@ class ArgoCDClient:
         Returns:
             Application details
         """
-        # Lowercase app name to avoid case mismatch issues
-        app_name = app_name.lower().replace("/", "-")
+        # Lowercase app name and replace / with - to avoid case mismatch issues
+        app_name = app_name.lower().replace("/", "-").replace("_", "-")
         endpoint = f"/applications/{app_name}"
         return self._make_request("GET", endpoint)
     
@@ -115,8 +115,8 @@ class ArgoCDClient:
         Returns:
             Application status information
         """
-        # Lowercase app name to avoid case mismatch issues
-        app_name = app_name.lower().replace("/", "-")
+        # Lowercase app name and replace / with - to avoid case mismatch issues
+        app_name = app_name.lower().replace("/", "-").replace("_", "-")
         try:
             app = self.get_application(app_name)
             
@@ -156,8 +156,8 @@ class ArgoCDClient:
         Returns:
             Sync operation response
         """
-        # Lowercase app name to avoid case mismatch issues
-        app_name = app_name.lower().replace("/", "-")
+        # Lowercase app name and replace / with - to avoid case mismatch issues
+        app_name = app_name.lower().replace("/", "-").replace("_", "-")
         endpoint = f"/applications/{app_name}/sync"
         
         data = {
