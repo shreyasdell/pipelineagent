@@ -24,13 +24,14 @@ def sanitize_model_name(model_id: str) -> str:
 class GitHubManifestManager:
     """
     GitHub Manifest Manager - Handles GitOps operations for Kubernetes manifests
-    Manages committing Kubernetes manifests to GitHub repository for ArgoCD deployment
+    Manages committing Kubernetes manifests and Helm values to GitHub repository for ArgoCD deployment
     """
-    
+
     def __init__(self):
         self.github_client = GitHubClient()
         self.default_branch = "main"
         self.manifests_path = "deployment/manifests"
+        self.helm_values_path = "deployment/helm/values"
     
     def commit_kubernetes_manifests(
         self,
@@ -228,7 +229,169 @@ class GitHubManifestManager:
                 "model_id": model_id,
                 "error": str(e)
             }
-    
+
+    def commit_helm_values(
+        self,
+        model_id: str,
+        values_content: str,
+        values_filename: str,
+        repository: Optional[str] = None,
+        branch: Optional[str] = None,
+        commit_message: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Commit Helm values file to GitHub repository for GitOps deployment
+
+        Args:
+            model_id: Model identifier
+            values_content: Helm values YAML content
+            values_filename: Name of the values file
+            repository: GitHub repository (format: owner/repo)
+            branch: Git branch to commit to
+            commit_message: Custom commit message
+
+        Returns:
+            Commit result with SHA and status
+        """
+        if not settings.github_token:
+            logger.error("GitHub token not configured - cannot commit Helm values")
+            return {
+                "status": "failed",
+                "reason": "GitHub token not configured",
+                "model_id": model_id
+            }
+
+        repo = repository or settings.github_repo
+        if not repo:
+            logger.error("GitHub repository not configured")
+            return {
+                "status": "failed",
+                "reason": "GitHub repository not configured",
+                "model_id": model_id
+            }
+
+        target_branch = branch or self.default_branch
+        values_file_path = f"{self.helm_values_path}/{values_filename}"
+
+        try:
+            # Step 1: Get current branch SHA
+            logger.info(f"Getting current branch SHA for {repo}...")
+            self.github_client.repo = repo
+            branch_info = self.github_client.get_branch(target_branch)
+
+            if not branch_info:
+                logger.error(f"Branch {target_branch} not found")
+                return {
+                    "status": "failed",
+                    "reason": f"Branch {target_branch} not found",
+                    "model_id": model_id
+                }
+
+            base_sha = branch_info.get("commit", {}).get("sha")
+            if not base_sha:
+                logger.error(f"Failed to get branch SHA from branch_info: {branch_info}")
+                return {
+                    "status": "failed",
+                    "reason": "Failed to get branch SHA",
+                    "model_id": model_id
+                }
+
+            logger.info(f"Base SHA: {base_sha}")
+
+            # Step 2: Create blob for values file
+            logger.info(f"Creating blob for Helm values file: {values_filename}")
+            blob_result = self.github_client.create_blob(values_content)
+            if not blob_result:
+                logger.error(f"Failed to create blob for {values_filename}")
+                return {
+                    "status": "failed",
+                    "reason": "Failed to create blob for values file",
+                    "model_id": model_id
+                }
+
+            blob_sha = blob_result.get("sha")
+            logger.info(f"Created blob for values file: {blob_sha}")
+
+            # Step 3: Create tree with values file
+            logger.info(f"Creating Git tree with Helm values file...")
+            tree_items = [{
+                "path": values_file_path,
+                "mode": "100644",
+                "type": "blob",
+                "sha": blob_sha
+            }]
+
+            tree_result = self.github_client.create_tree(tree_items, base_tree=base_sha)
+            if not tree_result:
+                logger.error("Failed to create Git tree")
+                return {
+                    "status": "failed",
+                    "reason": "Failed to create Git tree",
+                    "model_id": model_id
+                }
+
+            tree_sha = tree_result.get("sha")
+            logger.info(f"Created tree: {tree_sha}")
+
+            # Step 4: Create commit
+            logger.info("Creating commit...")
+            default_message = f"Add Helm values for model {model_id}"
+            final_message = commit_message or default_message
+
+            commit_result = self.github_client.create_commit(
+                message=final_message,
+                tree=tree_sha,
+                parents=[base_sha]
+            )
+
+            if not commit_result:
+                logger.error("Failed to create commit")
+                return {
+                    "status": "failed",
+                    "reason": "Failed to create commit",
+                    "model_id": model_id
+                }
+
+            commit_sha = commit_result.get("sha")
+            logger.info(f"Created commit: {commit_sha}")
+
+            # Step 5: Update branch reference
+            logger.info(f"Updating branch {target_branch} to new commit...")
+            self.github_client.repo = repo
+            update_result = self.github_client.update_reference(
+                f"heads/{target_branch}",
+                sha=commit_sha
+            )
+
+            if not update_result:
+                logger.error("Failed to update branch reference")
+                return {
+                    "status": "failed",
+                    "reason": "Failed to update branch reference",
+                    "model_id": model_id
+                }
+
+            logger.info(f"Successfully updated branch {target_branch}")
+
+            return {
+                "status": "success",
+                "commit_sha": commit_sha,
+                "branch": target_branch,
+                "repository": repo,
+                "values_file": values_file_path,
+                "model_id": model_id,
+                "message": final_message
+            }
+
+        except Exception as e:
+            logger.error(f"Error committing Helm values: {e}")
+            return {
+                "status": "error",
+                "reason": f"Error during commit: {str(e)}",
+                "model_id": model_id,
+                "error": str(e)
+            }
+
     def get_manifest_commit_status(
         self,
         model_id: str,

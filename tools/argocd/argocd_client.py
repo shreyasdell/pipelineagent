@@ -220,9 +220,64 @@ class ArgoCDClient:
         
         response = self._make_request("POST", endpoint, data)
         logger.info(f"Application {app_name} created successfully")
-        
+
         return response
-    
+
+    def create_helm_application(self, app_name: str, repo_url: str, chart_path: str,
+                               values_file: str, destination_server: str,
+                               destination_namespace: str, project: str = "default") -> Dict[str, Any]:
+        """
+        Create a new application in ArgoCD using Helm chart
+
+        Args:
+            app_name: Name of the application
+            repo_url: Git repository URL
+            chart_path: Path to Helm chart in repository
+            values_file: Path to values file relative to chart path
+            destination_server: Destination cluster server
+            destination_namespace: Destination namespace
+            project: ArgoCD project name
+
+        Returns:
+            Created application details
+        """
+        endpoint = "/applications"
+
+        data = {
+            "metadata": {
+                "name": app_name
+            },
+            "spec": {
+                "project": project,
+                "source": {
+                    "repoURL": repo_url,
+                    "targetRevision": "HEAD",
+                    "path": chart_path,
+                    "helm": {
+                        "valueFiles": [values_file]
+                    }
+                },
+                "destination": {
+                    "server": destination_server,
+                    "namespace": destination_namespace
+                },
+                "syncPolicy": {
+                    "automated": {
+                        "prune": True,
+                        "selfHeal": True
+                    },
+                    "syncOptions": [
+                        "CreateNamespace=true"
+                    ]
+                }
+            }
+        }
+
+        response = self._make_request("POST", endpoint, data)
+        logger.info(f"Helm application {app_name} created successfully")
+
+        return response
+
     def list_applications(self, label_selector: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         List all applications in ArgoCD
