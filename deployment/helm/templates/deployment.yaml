@@ -5,7 +5,7 @@ metadata:
   namespace: {{ .Values.namespace.name }}
   labels:
     app: {{ .Values.deployment.name }}
-    model: {{ .Values.model.id }}
+    model: {{ include "sglang-model-serving.sanitizeLabel" .Values.model.id }}
 spec:
   replicas: {{ .Values.deployment.replicas }}
   selector:
@@ -15,7 +15,7 @@ spec:
     metadata:
       labels:
         app: {{ .Values.deployment.name }}
-        model: {{ .Values.model.id }}
+        model: {{ include "sglang-model-serving.sanitizeLabel" .Values.model.id }}
     spec:
       runtimeClassName: {{ .Values.deployment.runtimeClass }}
       containers:

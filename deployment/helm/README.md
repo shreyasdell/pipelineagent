@@ -112,13 +112,33 @@ helm uninstall phi3-mini --namespace sglang-serving
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `model.id` | HuggingFace model ID | `microsoft/Phi-3-mini-4k-instruct` |
+| `model.id` | HuggingFace model ID (used in ConfigMap/env vars) | `microsoft/Phi-3-mini-4k-instruct` |
 | `model.name` | Kubernetes resource name | `phi-3-mini-4k-instruct` |
 | `model.storagePath` | Model storage path in PVC | `/models/phi3-mini` |
 | `deployment.replicas` | Number of replicas | `1` |
 | `deployment.runtimeClass` | Kubernetes runtime class | `nvidia` |
 | `container.image` | SGLang container image | `lmsysorg/sglang:latest` |
 | `container.port` | Container port | `8000` |
+
+### Label Sanitization
+
+Kubernetes labels have strict naming requirements (RFC 1123):
+- Must be 63 characters or less
+- Must consist of alphanumeric characters, `-`, or `.`
+- Must start and end with alphanumeric characters
+
+The Helm chart automatically sanitizes the `model.id` when used in Kubernetes labels:
+- Converts to lowercase
+- Replaces `/`, `_`, and `.` with `-`
+- Removes invalid characters
+- Limits to 63 characters
+
+**Example:**
+- Original model ID: `microsoft/Phi-3-mini-4k-instruct`
+- Label value: `microsoft-phi-3-mini-4k-instruct`
+
+The original model ID is preserved in ConfigMap data and environment variables for use by the application.
+
 | `resources.requests.cpu` | CPU request | `4` |
 | `resources.requests.memory` | Memory request | `16Gi` |
 | `resources.requests.nvidia.com/gpu` | GPU request | `1` |
