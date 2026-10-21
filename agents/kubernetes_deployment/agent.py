@@ -587,7 +587,15 @@ Kubernetes Deployment Requirements:
 - Latency Requirement: {state.get('latency_requirement', 'Not specified')}
 - Deployment Conversation ID: {state['deployment_conversation_id']}
 """
-        
+
+        # Add node capacity constraints
+        node_info = self._get_node_capacity_info()
+        if node_info:
+            prompt += f"""
+Node capacity constraints (DO NOT exceed these):
+{node_info}
+"""
+
         # Add constraint resolver report if available
         if state.get("constraint_resolver_report"):
             prompt += f"""
@@ -597,14 +605,14 @@ Model Characteristics:
 - Quantization Options: {state['constraint_resolver_report'].get('quantization_levels_possible', [])}
 - Parallelization: {state['constraint_resolver_report'].get('parallelization_possible', {})}
 """
-        
+
         # Add infrastructure details if available
         if state.get("infrastructure_details"):
             prompt += f"""
 Infrastructure Details:
 {self._format_infrastructure_details(state.get('infrastructure_details', {}))}
 """
-        
+
         # Add infrastructure availability
         if state.get("infrastructure_available"):
             infra = state['infrastructure_available']
@@ -616,15 +624,15 @@ Infrastructure Availability:
 - ArgoCD: {'✅ Available' if infra.get('argocd') else '❌ Not available'}
 - Hugging Face: {'✅ Available' if infra.get('huggingface') else '❌ Not available'}
 """
-        
+
         prompt += """
 Please design a comprehensive Kubernetes deployment that includes:
 1. Namespace configuration
-2. vLLM deployment with GPU support
+2. SGLang deployment with GPU support
 3. Service configuration for endpoint exposure
 4. Resource requirements (CPU, memory, GPU)
 5. Health check configuration
-6. ConfigMap for vLLM configuration
+6. ConfigMap for SGLang configuration
 
 Consider the model characteristics, infrastructure constraints, and serving requirements.
 """
@@ -634,12 +642,88 @@ Consider the model characteristics, infrastructure constraints, and serving requ
         """Format infrastructure details for the prompt"""
         if not infra_details:
             return "No infrastructure details provided"
-        
+
         formatted = []
         for key, value in infra_details.items():
             formatted.append(f"- {key}: {value}")
-        
+
         return "\n".join(formatted)
+
+    def _get_node_capacity_info(self) -> str:
+        """Get node capacity information for resource constraints"""
+        try:
+            v1 = client.CoreV1Api()
+            nodes = v1.list_node()
+            if nodes.items:
+                node = nodes.items[0]
+                allocatable = node.status.allocatable
+                memory = allocatable.get('memory', 'unknown')
+                cpu = allocatable.get('cpu', 'unknown')
+                gpu = allocatable.get('nvidia.com/gpu', '0')
+
+                # Parse memory to Gi
+                memory_gi = self._parse_memory_to_gi(memory)
+
+                info = f"""
+- Allocatable memory: {memory} (~{memory_gi:.1f} GiB)
+- Allocatable CPU: {cpu}
+- GPU: {gpu}
+
+IMPORTANT: Resource requests MUST be less than allocatable.
+- For memory, use at most 80% of allocatable memory (max {memory_gi * 0.8:.1f} Gi)
+- For models under 1B params: request 2-4Gi memory, limit 6-8Gi
+- For models 1B-3B params: request 4-8Gi memory, limit 8-12Gi
+- For models 3B-7B params: request 8-12Gi memory, limit 12-14Gi
+- Never request more than {min(memory_gi * 0.8, 14):.1f} Gi memory
+"""
+                return info
+        except Exception as e:
+            logger.warning(f"Could not get node info: {e}")
+            return """
+IMPORTANT: Keep memory requests reasonable.
+- Under 1B params: request 2-4Gi memory
+- 1B-3B params: request 4-8Gi memory
+- 3B-7B params: request 8-12Gi memory
+- Never request more than 12Gi memory
+"""
+
+    def _parse_memory_to_gi(self, memory_str: str) -> float:
+        """Parse Kubernetes memory string to GiB"""
+        try:
+            if memory_str.endswith('Ki'):
+                return int(memory_str[:-2]) / (1024 * 1024)
+            elif memory_str.endswith('Mi'):
+                return int(memory_str[:-2]) / 1024
+            elif memory_str.endswith('Gi'):
+                return float(memory_str[:-2])
+            elif memory_str.endswith('Ti'):
+                return float(memory_str[:-2]) * 1024
+            return 0
+        except:
+            return 0
+
+    def _cap_memory_requests(self, k8s_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Cap memory requests to prevent exceeding node capacity"""
+        MAX_MEMORY_REQUEST = "12Gi"
+        MAX_MEMORY_LIMIT = "14Gi"
+
+        resources = k8s_config.get("resource_requirements", {})
+        requests = resources.get("requests", {})
+        limits = resources.get("limits", {})
+
+        # Cap memory request if too high
+        request_mem = requests.get("memory", "0Gi")
+        if self._parse_memory_to_gi(request_mem) > 14:
+            requests["memory"] = MAX_MEMORY_REQUEST
+            logger.warning(f"Capped memory request to {MAX_MEMORY_REQUEST} (was {request_mem})")
+
+        # Cap memory limit if too high
+        limit_mem = limits.get("memory", "0Gi")
+        if self._parse_memory_to_gi(limit_mem) > 14:
+            limits["memory"] = MAX_MEMORY_LIMIT
+            logger.warning(f"Capped memory limit to {MAX_MEMORY_LIMIT} (was {limit_mem})")
+
+        return k8s_config
     
     def _parse_kubernetes_design(self, llm_response: str, state: AgentState) -> Dict[str, Any]:
         """
@@ -677,9 +761,14 @@ Consider the model characteristics, infrastructure constraints, and serving requ
                     return self._create_default_kubernetes_design(state)
             
             # Validate and structure the parsed data
+            k8s_config = parsed_data.get("kubernetes_configuration", {})
+
+            # Cap memory requests to prevent exceeding node capacity
+            k8s_config = self._cap_memory_requests(k8s_config)
+
             return {
                 "reasoning": parsed_data.get("reasoning", "Standard Kubernetes deployment design"),
-                "kubernetes_configuration": parsed_data.get("kubernetes_configuration", {})
+                "kubernetes_configuration": k8s_config
             }
             
         except json.JSONDecodeError as e:
