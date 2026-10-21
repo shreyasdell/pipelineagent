@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     argocd_url: Optional[str] = None
     argocd_username: Optional[str] = None
     argocd_password: Optional[str] = None
+    argocd_token: Optional[str] = None
     
     # Kubernetes Configuration
     default_namespace: str = "model-serving"
