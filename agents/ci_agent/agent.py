@@ -533,27 +533,32 @@ Consider the model characteristics and infrastructure constraints when designing
                 logger.warning(f"Could not create branch {branch_name}: {e}, using main branch")
                 branch_name = "main"
             
-            # Save each workflow file
+            # Save each workflow file using Git API (Contents API returns 404)
             for workflow_name, yaml_content in github_workflows.items():
                 try:
-                    result = self.github_client.create_workflow_file(
-                        workflow_name=workflow_name,
-                        workflow_content=yaml_content,
-                        branch=branch_name
+                    # Sanitize filename
+                    sanitized_filename = workflow_name.lower().replace(' ', '-').replace('_', '-')
+                    sanitized_filename = ''.join(c for c in sanitized_filename if c.isalnum() or c in '-.')
+
+                    result = self.github_client.create_file_via_git_api(
+                        repo=repo_name,
+                        branch=branch_name,
+                        file_path=f".github/workflows/{sanitized_filename}.yaml",
+                        content=yaml_content,
+                        commit_message=f"Add CI/CD workflow: {workflow_name} for {model_name}"
                     )
-                    
+
                     workflow_files[workflow_name] = {
                         "status": "created",
-                        "message": "Workflow file created successfully",
-                        "file_path": f".github/workflows/{workflow_name}.yaml",
+                        "message": "Workflow file created successfully via Git API",
+                        "file_path": f".github/workflows/{sanitized_filename}.yaml",
                         "branch": branch_name,
-                        "commit_url": result.get("content", {}).get("html_url"),
-                        "sha": result.get("content", {}).get("sha")
+                        "commit_sha": result.get("commit_sha")
                     }
-                    logger.info(f"Workflow file {workflow_name}.yaml created successfully")
-                    
+                    logger.info(f"Created workflow file via Git API: {result['path']}")
+
                 except Exception as e:
-                    logger.error(f"Failed to create workflow file {workflow_name}.yaml: {e}")
+                    logger.error(f"Failed to create workflow file {workflow_name}: {e}")
                     workflow_files[workflow_name] = {
                         "status": "failed",
                         "message": f"Failed to create workflow file: {str(e)}",
