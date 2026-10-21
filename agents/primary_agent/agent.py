@@ -419,7 +419,7 @@ Consider the constraint resolver recommendations when creating tasks.
         constraint_report = state.get('constraint_resolver_report', {})
         
         # Generate service endpoint from Kubernetes report or default
-        service_endpoint = k8s_report.get('service_endpoint', f"http://{model_id.replace('_', '-')}.model-serving.svc.cluster.local/v1/models")
+        service_endpoint = k8s_report.get('service_endpoint', f"http://172.24.52.99:30080/v1/models")
         
         # Determine overall deployment status
         deployment_status = "success"

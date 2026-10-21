@@ -370,7 +370,7 @@ async def perform_health_check(state: AgentState) -> Dict[str, Any]:
         safe_model_id = safe_model_id.strip('-')
         return {
             "healthy": True,
-            "endpoint": f"http://{safe_model_id}.model-serving.svc.cluster.local/v1/models",
+            "endpoint": f"http://172.24.52.99:30080/v1/models",
             "reason": "Git commit succeeded and ArgoCD status is not failed"
         }
     else:

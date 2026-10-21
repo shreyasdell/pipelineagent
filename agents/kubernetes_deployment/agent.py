@@ -980,9 +980,10 @@ resources:
 
 service:
   name: "{service_name}"
-  type: ClusterIP
+  type: NodePort
   port: {settings.sglang_port}
   targetPort: {settings.sglang_port}
+  nodePort: 30080
 
 pvc:
   name: "{deployment_name}-models-pvc"
@@ -1894,7 +1895,7 @@ spec:
             "deployment_verification": deployment_verification or {},
             "infrastructure_details": state.get('infrastructure_details', {}),
             "deployment_status": self._determine_deployment_status(deployment_verification or {}),
-            "service_endpoint": f"http://{safe_model_id}.model-serving.svc.cluster.local/v1/models",
+            "service_endpoint": f"http://172.24.52.99:30080/v1/models",
             "next_steps": self._generate_deployment_next_steps(deployment_verification or {}),
             "summary": self._generate_deployment_summary(model_id, deployment_verification or {})
         }

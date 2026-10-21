@@ -150,8 +150,18 @@ async def run_deployment(
         logger.info(f"Summary: {k8s_report.get('summary', 'No summary')}")
     
     if final_state.get("errors"):
-        logger.warning(f"Errors encountered: {len(final_state['errors'])}")
-        for error in final_state['errors']:
+        errors = final_state['errors']
+        # Deduplicate while preserving order
+        seen = set()
+        unique_errors = []
+        for error in errors:
+            error_str = str(error)
+            if error_str not in seen:
+                seen.add(error_str)
+                unique_errors.append(error)
+
+        logger.warning(f"Errors encountered: {len(unique_errors)}")
+        for error in unique_errors:
             logger.warning(f"  - {error}")
     
     logger.info("=" * 60)
