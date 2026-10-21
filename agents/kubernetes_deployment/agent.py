@@ -1527,16 +1527,16 @@ spec:
     async def _sync_argocd_application(self, state: AgentState) -> Dict[str, Any]:
         """
         Trigger ArgoCD application sync
-        
+
         Args:
             state: Current agent state
-            
+
         Returns:
             ArgoCD sync result
         """
         model_id = state['model_id']
         safe_model_id = model_id.replace('_', '-').replace('/', '')
-        
+
         try:
             if not settings.argocd_url:
                 logger.warning("ArgoCD URL not configured - skipping ArgoCD sync")
@@ -1545,20 +1545,31 @@ spec:
                     "reason": "ArgoCD URL not configured",
                     "model_id": model_id
                 }
-            
+
             # Trigger sync
-            sync_result = self.argocd_client.sync_application(
-                app_name=safe_model_id,
-                dry_run=False
-            )
-            
-            logger.info(f"ArgoCD sync triggered for {safe_model_id}")
-            return {
-                "status": "success",
-                "sync_details": sync_result,
-                "model_id": model_id
-            }
-            
+            try:
+                sync_result = self.argocd_client.sync_application(
+                    app_name=safe_model_id,
+                    dry_run=False
+                )
+                logger.info(f"ArgoCD sync triggered for {safe_model_id}")
+                return {
+                    "status": "success",
+                    "sync_details": sync_result,
+                    "model_id": model_id
+                }
+            except Exception as e:
+                error_str = str(e)
+                if "another operation is already in progress" in error_str.lower():
+                    logger.info(f"ArgoCD sync already in progress for {safe_model_id} - will complete automatically")
+                    return {
+                        "status": "in_progress",
+                        "reason": "Another sync operation is already in progress",
+                        "model_id": model_id
+                    }
+                else:
+                    raise
+
         except Exception as e:
             logger.error(f"Error triggering ArgoCD sync: {e}")
             return {

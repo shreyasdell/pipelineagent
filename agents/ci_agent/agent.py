@@ -501,16 +501,16 @@ Consider the model characteristics and infrastructure constraints when designing
     async def _save_workflows_to_github(self, github_workflows: Dict[str, str], state: AgentState) -> Dict[str, Any]:
         """
         Save generated workflows to GitHub repository
-        
+
         Args:
             github_workflows: Dictionary of workflow names to YAML content
             state: Current agent state
-            
+
         Returns:
             Dictionary of workflow file creation results
         """
         workflow_files = {}
-        
+
         if not settings.github_repo:
             logger.warning("GitHub repository not configured - skipping workflow file creation")
             for workflow_name in github_workflows.keys():
@@ -522,6 +522,10 @@ Consider the model characteristics and infrastructure constraints when designing
             return workflow_files
         
         try:
+            # Get repository name from settings
+            repo_name = settings.github_repo
+            logger.info(f"Using repository: {repo_name}")
+
             # Create a feature branch for CI pipeline changes
             # Sanitize model ID for branch name (remove special characters)
             safe_model_id = sanitize_model_name(state['model_id'])
@@ -532,13 +536,15 @@ Consider the model characteristics and infrastructure constraints when designing
             except Exception as e:
                 logger.warning(f"Could not create branch {branch_name}: {e}, using main branch")
                 branch_name = "main"
-            
+
             # Save each workflow file using Git API (Contents API returns 404)
             for workflow_name, yaml_content in github_workflows.items():
                 try:
                     # Sanitize filename
                     sanitized_filename = workflow_name.lower().replace(' ', '-').replace('_', '-')
                     sanitized_filename = ''.join(c for c in sanitized_filename if c.isalnum() or c in '-.')
+
+                    logger.info(f"Creating workflow file via Git API: repo={repo_name}, branch={branch_name}, file={sanitized_filename}.yaml")
 
                     result = self.github_client.create_file_via_git_api(
                         repo=repo_name,
