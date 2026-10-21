@@ -52,11 +52,21 @@ class GitHubClient:
             if method == "GET":
                 response = requests.get(url, headers=self.headers, params=data)
             elif method == "POST":
-                response = requests.post(url, headers=self.headers, json=json or data)
+                # Use json if provided, otherwise use data
+                if json is not None:
+                    response = requests.post(url, headers=self.headers, json=json)
+                else:
+                    response = requests.post(url, headers=self.headers, json=data)
             elif method == "PUT":
-                response = requests.put(url, headers=self.headers, json=json or data)
+                if json is not None:
+                    response = requests.put(url, headers=self.headers, json=json)
+                else:
+                    response = requests.put(url, headers=self.headers, json=data)
             elif method == "PATCH":
-                response = requests.patch(url, headers=self.headers, json=json or data)
+                if json is not None:
+                    response = requests.patch(url, headers=self.headers, json=json)
+                else:
+                    response = requests.patch(url, headers=self.headers, json=data)
             elif method == "DELETE":
                 response = requests.delete(url, headers=self.headers)
             else:
