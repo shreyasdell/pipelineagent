@@ -4,10 +4,10 @@
 model:
   id: "mistralai-Timestral-209M"
   name: "mistralai-timestral-209m"
-  storagePath: "/models/mistralai-Timestral-209M"
+  storagePath: "/models/mistralai-Timestral-209M.onnx"
 
 deployment:
-  name: "sglang-mistralai-timestral-209m"
+  name: "mistralai-timestral-209m"
   replicas: 1
   runtimeClass: nvidia
 
@@ -25,34 +25,35 @@ container:
 
 resources:
   requests:
-    cpu: 4
-    memory: 16Gi
+    cpu: 2
+    memory: 8Gi
     nvidiaGpu: 1
   limits:
     nvidiaGpu: 1
 
 service:
-  name: "sglang-mistralai-timestral-209m-service"
-  type: ClusterIP
+  name: "mistralai-timestral-209m-service"
+  type: NodePort
   port: 8000
   targetPort: 8000
+  nodePort: 30080
 
 pvc:
-  name: "sglang-mistralai-timestral-209m-models-pvc"
+  name: "mistralai-timestral-209m-models-pvc"
   size: 50Gi
   accessModes:
     - ReadWriteOnce
 
 configMap:
-  name: "sglang-mistralai-timestral-209m-config"
+  name: "mistralai-timestral-209m-config"
   data:
     MODEL_ID: "mistralai-Timestral-209M"
-    MODEL_PATH: "/models/mistralai-Timestral-209M"
+    MODEL_PATH: "/models/mistralai-Timestral-209M.onnx"
     PORT: "8000"
     HOST: "0.0.0.0"
 
 namespace:
-  name: "sglang-serving"
+  name: "sglang-deploy"
   create: true
 
 healthCheck:
