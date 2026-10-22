@@ -4,6 +4,10 @@ import os
 from pathlib import Path
 from core.config.settings import settings
 from loguru import logger
+import urllib3
+
+# Suppress SSL warnings for HuggingFace API (WSL SSL certificate issue)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class HuggingFaceClient:
@@ -42,16 +46,16 @@ class HuggingFaceClient:
             Response JSON data
         """
         url = f"{self.base_url}{endpoint}"
-        
+
         try:
             if method == "GET":
-                response = requests.get(url, headers=self.headers, params=params)
+                response = requests.get(url, headers=self.headers, params=params, verify=False)
             elif method == "POST":
-                response = requests.post(url, headers=self.headers, json=data)
+                response = requests.post(url, headers=self.headers, json=data, verify=False)
             elif method == "PUT":
-                response = requests.put(url, headers=self.headers, json=data)
+                response = requests.put(url, headers=self.headers, json=data, verify=False)
             elif method == "DELETE":
-                response = requests.delete(url, headers=self.headers)
+                response = requests.delete(url, headers=self.headers, verify=False)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
             

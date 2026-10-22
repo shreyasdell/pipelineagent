@@ -500,62 +500,58 @@ class GitHubClient:
     def create_file_via_git_api(self, repo: str, branch: str, file_path: str, content: str, commit_message: str) -> Dict[str, Any]:
         """
         Create a file using the low-level Git API (blob/tree/commit/ref).
-        This bypasses the Contents API which returns 404 for some repos.
-
-        Args:
-            repo: GitHub repository in format "owner/repo"
-            branch: Branch to create the file on
-            file_path: Path to the file in the repository
-            content: File content
-            commit_message: Commit message
-
-        Returns:
-            Creation result with commit SHA and file path
+        Uses the existing helper methods that are proven to work.
         """
-        # 1. Get the current branch SHA
-        ref_data = self._make_request("GET", f"/repos/{repo}/git/refs/heads/{branch}")
-        base_sha = ref_data["object"]["sha"]
+        # Temporarily set self.repo so helper methods use the correct repo
+        original_repo = self.repo
+        self.repo = repo
+        try:
+            # 1. Get the current branch SHA (or create branch if it doesn't exist)
+            try:
+                branch_info = self.get_branch(branch)
+                base_sha = branch_info["commit"]["sha"]
+            except:
+                # Branch doesn't exist, create it from main
+                logger.info(f"Branch {branch} not found, creating from main...")
+                main_branch_info = self.get_branch("main")
+                base_sha = main_branch_info["commit"]["sha"]
+                self.create_reference(f"refs/heads/{branch}", base_sha)
 
-        # 2. Get the current commit's tree SHA
-        commit_data = self._make_request("GET", f"/repos/{repo}/git/commits/{base_sha}")
-        base_tree_sha = commit_data["tree"]["sha"]
+            # 2. Get the current commit's tree SHA
+            commit_data = self.get_commit(base_sha)
+            base_tree_sha = commit_data["tree"]["sha"]
 
-        # 3. Create a blob with the file content
-        if isinstance(content, str):
-            content_b64 = base64.b64encode(content.encode("utf-8")).decode("utf-8")
-        else:
-            content_b64 = base64.b64encode(content).decode("utf-8")
+            # 3. Create a blob with the file content
+            blob = self.create_blob(content)
 
-        blob = self._make_request("POST", f"/repos/{repo}/git/blobs", json={
-            "content": content_b64,
-            "encoding": "base64"
-        })
+            # 4. Create a new tree that includes the file
+            tree = self.create_tree(
+                tree_items=[{
+                    "path": file_path,
+                    "mode": "100644",
+                    "type": "blob",
+                    "sha": blob["sha"]
+                }],
+                base_tree=base_tree_sha
+            )
 
-        # 4. Create a new tree that includes the file
-        tree = self._make_request("POST", f"/repos/{repo}/git/trees", json={
-            "base_tree": base_tree_sha,
-            "tree": [{
+            # 5. Create a new commit
+            new_commit = self.create_commit(
+                message=commit_message,
+                tree=tree["sha"],
+                parents=[base_sha]
+            )
+
+            # 6. Update the branch reference
+            self.update_reference(
+                ref=f"heads/{branch}",
+                sha=new_commit["sha"]
+            )
+
+            return {
+                "commit_sha": new_commit["sha"],
                 "path": file_path,
-                "mode": "100644",
-                "type": "blob",
-                "sha": blob["sha"]
-            }]
-        })
-
-        # 5. Create a new commit
-        new_commit = self._make_request("POST", f"/repos/{repo}/git/commits", json={
-            "message": commit_message,
-            "tree": tree["sha"],
-            "parents": [base_sha]
-        })
-
-        # 6. Update the branch reference to point to the new commit
-        self._make_request("PATCH", f"/repos/{repo}/git/refs/heads/{branch}", json={
-            "sha": new_commit["sha"]
-        })
-
-        return {
-            "commit_sha": new_commit["sha"],
-            "path": file_path,
-            "status": "created"
-        }
+                "status": "created"
+            }
+        finally:
+            self.repo = original_repo
