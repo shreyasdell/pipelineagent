@@ -4,7 +4,7 @@
 model:
   id: "facebook/sam3"
   name: "facebook-sam3"
-  storagePath: "/models/facebook/sam3.onnx"
+  storagePath: "/models/facebook/sam3/sam3.safetensors"
 
 deployment:
   name: "sglang-deployment"
@@ -48,12 +48,12 @@ configMap:
   name: "sglang-deployment-config"
   data:
     MODEL_ID: "facebook/sam3"
-    MODEL_PATH: "/models/facebook/sam3.onnx"
+    MODEL_PATH: "/models/facebook/sam3/sam3.safetensors"
     PORT: "8000"
     HOST: "0.0.0.0"
 
 namespace:
-  name: "sglang-namespace"
+  name: "sglang-dep-2026-10-23-2b2940e3"
   create: true
 
 healthCheck:
