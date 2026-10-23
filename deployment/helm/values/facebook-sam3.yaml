@@ -4,7 +4,7 @@
 model:
   id: "facebook/sam3"
   name: "facebook-sam3"
-  storagePath: "/models/facebook/sam3"
+  storagePath: "/models/facebook/sam3.safetensors"
 
 deployment:
   name: "sglang-deployment"
@@ -26,7 +26,7 @@ container:
 resources:
   requests:
     cpu: 2
-    memory: 4Gi
+    memory: 12Gi
     nvidiaGpu: 1
   limits:
     nvidiaGpu: 1
@@ -48,12 +48,12 @@ configMap:
   name: "sglang-deployment-config"
   data:
     MODEL_ID: "facebook/sam3"
-    MODEL_PATH: "/models/facebook/sam3"
+    MODEL_PATH: "/models/facebook/sam3.safetensors"
     PORT: "8000"
     HOST: "0.0.0.0"
 
 namespace:
-  name: "sglang-deploy-namespace"
+  name: "sglang-deployment-namespace"
   create: true
 
 healthCheck:
