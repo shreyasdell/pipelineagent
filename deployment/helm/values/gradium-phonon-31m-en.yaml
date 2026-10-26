@@ -7,7 +7,7 @@ model:
   storagePath: "/models/gradium/phonon-31m-en"
 
 deployment:
-  name: "sglang-deployment"
+  name: "phonon-31m-en"
   replicas: 1
   runtimeClass: nvidia
 
@@ -32,20 +32,20 @@ resources:
     nvidiaGpu: 1
 
 service:
-  name: "sglang-service"
+  name: "phonon-31m-en-service"
   type: NodePort
   port: 8000
   targetPort: 8000
   nodePort: 30080
 
 pvc:
-  name: "sglang-deployment-models-pvc"
+  name: "phonon-31m-en-models-pvc"
   size: 50Gi
   accessModes:
     - ReadWriteOnce
 
 configMap:
-  name: "sglang-deployment-config"
+  name: "phonon-31m-en-config"
   data:
     MODEL_ID: "gradium/phonon-31m-en"
     MODEL_PATH: "/models/gradium/phonon-31m-en"
@@ -53,7 +53,7 @@ configMap:
     HOST: "0.0.0.0"
 
 namespace:
-  name: "sglang"
+  name: "sglang-deployments"
   create: true
 
 healthCheck:
