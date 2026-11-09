@@ -9,7 +9,7 @@ from core.state.persistence import state_manager
 from core.config.settings import settings
 from tools.github.github_client import GitHubClient
 from loguru import logger
-
+from tools.gitops.github_manifest_manager import GitHubManifestManager
 
 def sanitize_model_name(model_id: str) -> str:
     """
@@ -36,6 +36,7 @@ class CIAgent:
     def __init__(self):
         self.llm = get_llm()
         self.github_client = GitHubClient()
+        self.manifest_manager = GitHubManifestManager()  
         self.system_prompt = """You are a CI/CD Agent for AI model deployment.
 Your task is to create GitHub Actions workflows for automated CI/CD pipelines.
 
@@ -501,16 +502,8 @@ Consider the model characteristics and infrastructure constraints when designing
     async def _save_workflows_to_github(self, github_workflows: Dict[str, str], state: AgentState) -> Dict[str, Any]:
         """
         Save generated workflows to GitHub repository
-
-        Args:
-            github_workflows: Dictionary of workflow names to YAML content
-            state: Current agent state
-
-        Returns:
-            Dictionary of workflow file creation results
         """
         workflow_files = {}
-
         if not settings.github_repo:
             logger.warning("GitHub repository not configured - skipping workflow file creation")
             for workflow_name in github_workflows.keys():
@@ -522,50 +515,69 @@ Consider the model characteristics and infrastructure constraints when designing
             return workflow_files
         
         try:
-            # Get repository name from settings
             repo_name = settings.github_repo
             logger.info(f"Using repository: {repo_name}")
-
-            # Get model name from state
             model_name = state.get('model_id', 'unknown-model')
-
-            # Create a feature branch for CI pipeline changes
-            # Sanitize model ID for branch name (remove special characters)
             safe_model_id = sanitize_model_name(state['model_id'])
             branch_name = f"ci-pipeline-{safe_model_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            
             try:
                 self.github_client.create_branch(branch_name)
                 logger.info(f"Created branch: {branch_name}")
             except Exception as e:
                 logger.warning(f"Could not create branch {branch_name}: {e}, using main branch")
                 branch_name = "main"
-
-            # Save each workflow file using Git API (Contents API returns 404)
+            
+            # Save each workflow file using direct Git API helpers
             for workflow_name, yaml_content in github_workflows.items():
                 try:
-                    # Sanitize filename
                     sanitized_filename = workflow_name.lower().replace(' ', '-').replace('_', '-')
                     sanitized_filename = ''.join(c for c in sanitized_filename if c.isalnum() or c in '-.')
-
+                    file_path = f".github/workflows/{sanitized_filename}.yaml"
+                    
                     logger.info(f"Creating workflow file via Git API: repo={repo_name}, branch={branch_name}, file={sanitized_filename}.yaml")
-
-                    result = self.github_client.create_file_via_git_api(
-                        repo=repo_name,
-                        branch=branch_name,
-                        file_path=f".github/workflows/{sanitized_filename}.yaml",
-                        content=yaml_content,
-                        commit_message=f"Add CI/CD workflow: {workflow_name} for {model_name}"
+                    
+                    # Use GitHubManifestManager's client (proven working for tree creation)
+                    self.manifest_manager.github_client.repo = repo_name
+                    
+                    branch_info = self.manifest_manager.github_client.get_branch(branch_name)
+                    base_sha = branch_info["commit"]["sha"]
+                    
+                    commit_data = self.manifest_manager.github_client.get_commit(base_sha)
+                    base_tree_sha = commit_data["tree"]["sha"]
+                    
+                    blob_result = self.manifest_manager.github_client.create_blob(yaml_content)
+                    
+                    tree_result = self.manifest_manager.github_client.create_tree(
+                        tree_items=[{
+                            "path": file_path,
+                            "mode": "100644",
+                            "type": "blob",
+                            "sha": blob_result["sha"]
+                        }],
+                        base_tree=base_tree_sha
                     )
-
+                    
+                    commit_result = self.manifest_manager.github_client.create_commit(
+                        message=f"Add CI/CD workflow: {workflow_name} for {model_name}",
+                        tree=tree_result["sha"],
+                        parents=[base_sha]
+                    )
+                    
+                    self.manifest_manager.github_client.update_reference(
+                        ref=f"heads/{branch_name}",
+                        sha=commit_result["sha"]
+                    )
+                    
                     workflow_files[workflow_name] = {
                         "status": "created",
                         "message": "Workflow file created successfully via Git API",
-                        "file_path": f".github/workflows/{sanitized_filename}.yaml",
+                        "file_path": file_path,
                         "branch": branch_name,
-                        "commit_sha": result.get("commit_sha")
+                        "commit_sha": commit_result["sha"]
                     }
-                    logger.info(f"Created workflow file via Git API: {result['path']}")
-
+                    logger.info(f"Created workflow file via Git API: {file_path}")
+                    
                 except Exception as e:
                     logger.error(f"Failed to create workflow file {workflow_name}: {e}")
                     workflow_files[workflow_name] = {
@@ -588,7 +600,6 @@ Consider the model characteristics and infrastructure constraints when designing
                     )
                     logger.info(f"Pull request created: {pr.get('html_url')}")
                     
-                    # Add PR info to workflow files
                     for workflow_name in workflow_files:
                         workflow_files[workflow_name]["pull_request"] = {
                             "url": pr.get("html_url"),

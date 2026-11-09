@@ -557,17 +557,18 @@ Constraint Resolver Report: {state.get('constraint_resolver_report', 'Not availa
             logger.warning("ArgoCD not available")
 
         try:
-            # Check Hugging Face connectivity (skip for local Ollama models)
-            model_id = state.get('model_id', '')
-            if ':' in model_id and not '/' in model_id:  # Ollama model format
-                logger.info(f"Skipping Hugging Face check for local Ollama model: {model_id}")
-                infrastructure_status["huggingface"] = False
-            else:
-                model_info = self.huggingface_client.get_model_info("Qwen/Qwen2.5-7B")
-                infrastructure_status["huggingface"] = True
+            # Check Hugging Face connectivity with SSL verification disabled
+            # (corporate proxy intercepts SSL with self-signed cert)
+            import requests as req
+            r = req.get("https://huggingface.co/api/models/Qwen/Qwen2.5-7B", timeout=5, verify=False)
+            infrastructure_status["huggingface"] = r.status_code == 200
+            if infrastructure_status["huggingface"]:
                 logger.info("Hugging Face accessible")
-        except:
-            logger.warning("Hugging Face not accessible")
+            else:
+                logger.warning(f"Hugging Face returned status {r.status_code}")
+        except Exception as e:
+            logger.warning(f"Hugging Face not accessible: {e}")
+            infrastructure_status["huggingface"] = False
 
         return infrastructure_status
 
